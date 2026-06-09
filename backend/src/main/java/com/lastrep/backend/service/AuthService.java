@@ -30,30 +30,30 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use");
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Username already taken");
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setUsername(request.getUsername());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getName(), user.getEmail());
+        String token = jwtUtil.generateToken(user.getUsername());
+        return new AuthResponse(token, user.getName(), user.getUsername());
     }
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getEmail(), request.getPassword()));
+                        request.getUsername(), request.getPassword()));
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getName(), user.getEmail());
+        String token = jwtUtil.generateToken(user.getUsername());
+        return new AuthResponse(token, user.getName(), user.getUsername());
     }
 }
