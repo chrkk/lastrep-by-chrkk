@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import MobileOnly from './components/MobileOnly'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -12,36 +13,38 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
     return (
-        <BrowserRouter>
-            <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+        <MobileOnly>
+            <BrowserRouter>
+                <Routes>
+                    {/* Public routes */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
 
-                {/* Protected routes */}
-                <Route path="/" element={
-                    <ProtectedRoute><Dashboard /></ProtectedRoute>
-                } />
-                <Route path="/exercises" element={
-                    <ProtectedRoute><Exercises /></ProtectedRoute>
-                } />
-                <Route path="/routines" element={
-                    <ProtectedRoute><Routines /></ProtectedRoute>
-                } />
-                <Route path="/routines/:id" element={
-                    <ProtectedRoute><RoutineDetail /></ProtectedRoute>
-                } />
-                <Route path="/workout/:sessionId" element={
-                    <ProtectedRoute><StartWorkout /></ProtectedRoute>
-                } />
-                <Route path="/history" element={
-                    <ProtectedRoute><WorkoutHistory /></ProtectedRoute>
-                } />
-                <Route path="/exercises/:id/history" element={
-                    <ProtectedRoute><ExerciseHistory /></ProtectedRoute>
-                } />
-            </Routes>
-        </BrowserRouter>
+                    {/* Protected routes */}
+                    <Route path="/" element={
+                        <ProtectedRoute><Dashboard /></ProtectedRoute>
+                    } />
+                    <Route path="/exercises" element={
+                        <ProtectedRoute><Exercises /></ProtectedRoute>
+                    } />
+                    <Route path="/routines" element={
+                        <ProtectedRoute><Routines /></ProtectedRoute>
+                    } />
+                    <Route path="/routines/:id" element={
+                        <ProtectedRoute><RoutineDetail /></ProtectedRoute>
+                    } />
+                    <Route path="/workout/:sessionId" element={
+                        <ProtectedRoute><StartWorkout /></ProtectedRoute>
+                    } />
+                    <Route path="/history" element={
+                        <ProtectedRoute><WorkoutHistory /></ProtectedRoute>
+                    } />
+                    <Route path="/exercises/:id/history" element={
+                        <ProtectedRoute><ExerciseHistory /></ProtectedRoute>
+                    } />
+                </Routes>
+            </BrowserRouter>
+        </MobileOnly>
     )
 }
 
