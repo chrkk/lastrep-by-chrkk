@@ -18,3 +18,4 @@ server:
 app:
   jwt-secret: ${JWT_SECRET:lastrep-super-secret-key-change-this-in-production-make-it-long}
   jwt-expiration-ms: 86400000
+  jwt-extended-expiration-ms: 2592000000

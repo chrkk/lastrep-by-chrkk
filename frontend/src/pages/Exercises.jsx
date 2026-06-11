@@ -25,6 +25,16 @@ export default function Exercises() {
         fetchExercises()
     }, [])
 
+    // Lock body scroll when modal is open
+    useEffect(() => {
+        if (showForm) {
+            document.body.style.overflow = 'hidden'
+        } else {
+            document.body.style.overflow = ''
+        }
+        return () => { document.body.style.overflow = '' }
+    }, [showForm])
+
     async function fetchExercises() {
         try {
             const res = await api.get('/api/exercises')
@@ -95,120 +105,36 @@ export default function Exercises() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-950">
+        <div className="min-h-screen bg-gray-950 pb-8">
             <Navbar />
 
-            <div className="max-w-2xl mx-auto px-4 py-8">
+            <div className="px-4 py-6">
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-5">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Exercises</h1>
-                        <p className="text-gray-500 text-sm mt-0.5">Your exercise library</p>
+                        <h1 className="text-xl font-bold text-white">Exercises</h1>
+                        <p className="text-gray-500 text-xs mt-0.5">Your exercise library</p>
                     </div>
                     <button
                         onClick={openCreateForm}
-                        className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                        className="bg-orange-500 active:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
                     >
-                        + Add Exercise
+                        + Add
                     </button>
                 </div>
-
-                {/* Form Modal */}
-                {showForm && (
-                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
-                            <h2 className="text-white font-semibold text-lg mb-5">
-                                {editingExercise ? 'Edit Exercise' : 'New Exercise'}
-                            </h2>
-
-                            {error && (
-                                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">
-                                    {error}
-                                </div>
-                            )}
-
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-gray-400 text-sm mb-1.5">
-                                        Exercise name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={form.name}
-                                        onChange={handleChange}
-                                        placeholder="e.g. Bench Press"
-                                        required
-                                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-gray-400 text-sm mb-1.5">
-                                        Muscle group
-                                    </label>
-                                    <select
-                                        name="muscleGroup"
-                                        value={form.muscleGroup}
-                                        onChange={handleChange}
-                                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-orange-500 transition-colors"
-                                    >
-                                        <option value="">Select muscle group</option>
-                                        {MUSCLE_GROUPS.map(mg => (
-                                            <option key={mg} value={mg}>{mg}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-gray-400 text-sm mb-1.5">
-                                        Equipment
-                                    </label>
-                                    <select
-                                        name="equipment"
-                                        value={form.equipment}
-                                        onChange={handleChange}
-                                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-orange-500 transition-colors"
-                                    >
-                                        <option value="">Select equipment</option>
-                                        {EQUIPMENT.map(eq => (
-                                            <option key={eq} value={eq}>{eq}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={closeForm}
-                                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium py-2.5 rounded-lg transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={saving}
-                                        className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
-                                    >
-                                        {saving ? 'Saving...' : editingExercise ? 'Save changes' : 'Add exercise'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
 
                 {/* Exercise List */}
                 {loading ? (
                     <div className="text-gray-600 text-sm text-center py-16">
-                        Loading exercises...
+                        Loading...
                     </div>
                 ) : exercises.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-gray-600 text-sm">No exercises yet.</p>
-                        <p className="text-gray-700 text-sm mt-1">
-                            Add your first exercise to get started.
+                        <p className="text-4xl mb-3">🏋️</p>
+                        <p className="text-gray-500 text-sm">No exercises yet.</p>
+                        <p className="text-gray-600 text-xs mt-1">
+                            Tap + Add to create your first exercise.
                         </p>
                     </div>
                 ) : (
@@ -216,43 +142,143 @@ export default function Exercises() {
                         {exercises.map(exercise => (
                             <div
                                 key={exercise.id}
-                                className="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 flex items-center justify-between"
+                                className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4"
                             >
-                                <div>
-                                    <p className="text-white font-medium text-sm">{exercise.name}</p>
-                                    <div className="flex gap-2 mt-1">
-                                        {exercise.muscleGroup && (
-                                            <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
-                        {exercise.muscleGroup}
-                      </span>
-                                        )}
-                                        {exercise.equipment && (
-                                            <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
-                        {exercise.equipment}
-                      </span>
-                                        )}
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-white font-medium text-sm truncate">
+                                            {exercise.name}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {exercise.muscleGroup && (
+                                                <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
+                          {exercise.muscleGroup}
+                        </span>
+                                            )}
+                                            {exercise.equipment && (
+                                                <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
+                          {exercise.equipment}
+                        </span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => openEditForm(exercise)}
-                                        className="text-gray-500 hover:text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(exercise.id)}
-                                        className="text-gray-500 hover:text-red-400 text-xs px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
-                                    >
-                                        Delete
-                                    </button>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                        <button
+                                            onClick={() => openEditForm(exercise)}
+                                            className="text-gray-500 active:text-white text-xs px-3 py-1.5 rounded-lg active:bg-gray-800 transition-colors"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(exercise.id)}
+                                            className="text-gray-500 active:text-red-400 text-xs px-3 py-1.5 rounded-lg active:bg-gray-800 transition-colors"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
+
+            {/* Bottom Sheet Modal */}
+            {showForm && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/70"
+                        onClick={closeForm}
+                    />
+
+                    {/* Sheet */}
+                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 pb-10 z-10">
+
+                        {/* Handle bar */}
+                        <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
+
+                        <h2 className="text-white font-semibold text-lg mb-5">
+                            {editingExercise ? 'Edit Exercise' : 'New Exercise'}
+                        </h2>
+
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 mb-4">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-1.5">
+                                    Exercise name
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={form.name}
+                                    onChange={handleChange}
+                                    placeholder="e.g. Bench Press"
+                                    required
+                                    autoFocus
+                                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-1.5">
+                                    Muscle group
+                                </label>
+                                <select
+                                    name="muscleGroup"
+                                    value={form.muscleGroup}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500 transition-colors"
+                                >
+                                    <option value="">Select muscle group</option>
+                                    {MUSCLE_GROUPS.map(mg => (
+                                        <option key={mg} value={mg}>{mg}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-1.5">
+                                    Equipment
+                                </label>
+                                <select
+                                    name="equipment"
+                                    value={form.equipment}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500 transition-colors"
+                                >
+                                    <option value="">Select equipment</option>
+                                    {EQUIPMENT.map(eq => (
+                                        <option key={eq} value={eq}>{eq}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={closeForm}
+                                    className="flex-1 bg-gray-800 active:bg-gray-700 text-gray-300 text-sm font-medium py-3 rounded-xl transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="flex-1 bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-3 rounded-xl transition-colors"
+                                >
+                                    {saving ? 'Saving...' : editingExercise ? 'Save changes' : 'Add exercise'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
