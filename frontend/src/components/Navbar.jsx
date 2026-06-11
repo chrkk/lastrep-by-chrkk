@@ -16,66 +16,61 @@ export default function Navbar() {
     }
 
     return (
-        <nav className="bg-gray-900 border-b border-gray-800">
-            <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-
-                {/* Logo */}
+        <nav className="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
+            <div className="px-4 h-14 flex items-center justify-between">
                 <Link to="/" className="text-white font-bold text-lg tracking-tight">
                     LastRep
                 </Link>
 
-                {/* Nav Links */}
                 <div className="flex items-center gap-1">
                     <Link
                         to="/"
-                        className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                             isActive('/')
                                 ? 'text-white bg-gray-800'
-                                : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                                : 'text-gray-500'
                         }`}
                     >
-                        Dashboard
+                        Home
                     </Link>
                     <Link
                         to="/exercises"
-                        className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                             isActive('/exercises')
                                 ? 'text-white bg-gray-800'
-                                : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                                : 'text-gray-500'
                         }`}
                     >
                         Exercises
                     </Link>
                     <Link
                         to="/routines"
-                        className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                             isActive('/routines')
                                 ? 'text-white bg-gray-800'
-                                : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                                : 'text-gray-500'
                         }`}
                     >
                         Routines
                     </Link>
                     <Link
                         to="/history"
-                        className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                             isActive('/history')
                                 ? 'text-white bg-gray-800'
-                                : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                                : 'text-gray-500'
                         }`}
                     >
                         History
                     </Link>
                 </div>
 
-                {/* Logout */}
                 <button
                     onClick={handleLogout}
-                    className="text-gray-500 hover:text-white text-sm transition-colors"
+                    className="text-gray-600 text-xs"
                 >
-                    Log out
+                    Out
                 </button>
-
             </div>
         </nav>
     )
