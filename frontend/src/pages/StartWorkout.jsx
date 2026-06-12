@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import ExerciseSetCard from '../components/ExerciseSetCard'
+import RestTimer from '../components/RestTimer'
+import ExerciseMenu from '../components/ExerciseMenu'
 
 export default function StartWorkout() {
     const { sessionId } = useParams()
@@ -11,40 +14,44 @@ export default function StartWorkout() {
     const [elapsed, setElapsed] = useState(0)
     const [showFinishModal, setShowFinishModal] = useState(false)
     const [showAddExercise, setShowAddExercise] = useState(false)
-    const [exercises, setExercises] = useState([])
+    const [showReplaceFor, setShowReplaceFor] = useState(null)
+    const [allExercises, setAllExercises] = useState([])
     const [finishing, setFinishing] = useState(false)
     const [lastPerformances, setLastPerformances] = useState({})
-    const [setInputs, setSetInputs] = useState({})
+    const [restActive, setRestActive] = useState(false)
+    const [menuExercise, setMenuExercise] = useState(null)
+    const [exerciseMeta, setExerciseMeta] = useState({})
     const timerRef = useRef(null)
 
     useEffect(() => {
         fetchSession()
-        fetchExercises()
+        fetchAllExercises()
     }, [sessionId])
 
     useEffect(() => {
-        if (session) {
-            timerRef.current = setInterval(() => {
-                const start = new Date(session.createdAt)
-                const now = new Date()
-                setElapsed(Math.floor((now - start) / 1000))
-            }, 1000)
-        }
+        if (!session) return
+        timerRef.current = setInterval(() => {
+            const start = new Date(session.createdAt)
+            setElapsed(Math.floor((now() - start) / 1000))
+        }, 1000)
         return () => clearInterval(timerRef.current)
-    }, [session])
+    }, [session?.id])
 
     useEffect(() => {
-        const open = showFinishModal || showAddExercise
+        const open = showFinishModal || showAddExercise ||
+            menuExercise !== null || showReplaceFor !== null
         document.body.style.overflow = open ? 'hidden' : ''
         return () => { document.body.style.overflow = '' }
-    }, [showFinishModal, showAddExercise])
+    }, [showFinishModal, showAddExercise, menuExercise, showReplaceFor])
+
+    function now() { return new Date() }
 
     async function fetchSession() {
         try {
             const res = await api.get(`/api/workout-sessions/${sessionId}`)
             setSession(res.data)
             await fetchLastPerformances(res.data.exercises)
-            initSetInputs(res.data.exercises)
+            initMeta(res.data.exercises)
         } catch (err) {
             console.error('Failed to fetch session', err)
         } finally {
@@ -52,19 +59,19 @@ export default function StartWorkout() {
         }
     }
 
-    async function fetchExercises() {
+    async function fetchAllExercises() {
         try {
             const res = await api.get('/api/exercises')
-            setExercises(res.data)
+            setAllExercises(res.data)
         } catch (err) {
-            console.error('Failed to fetch exercises', err)
+            console.error(err)
         }
     }
 
     async function fetchLastPerformances(sessionExercises) {
         const performances = {}
         await Promise.all(
-            sessionExercises.map(async (se) => {
+            sessionExercises.map(async se => {
                 try {
                     const res = await api.get(
                         `/api/workout-sessions/exercises/${se.exerciseId}/last-performance`
@@ -72,25 +79,22 @@ export default function StartWorkout() {
                     if (res.status === 200 && res.data) {
                         performances[se.exerciseId] = res.data
                     }
-                } catch (err) {
-                }
+                } catch (_) {}
             })
         )
         setLastPerformances(performances)
     }
 
-    function initSetInputs(sessionExercises) {
-        const inputs = {}
+    function initMeta(sessionExercises) {
+        const meta = {}
         sessionExercises.forEach(se => {
-            inputs[se.id] = {
-                weight: '',
-                weightUnit: 'KG',
-                reps: '',
-                setType: 'NORMAL',
-                drops: [{ weight: '', weightUnit: 'KG', reps: '' }]
+            meta[se.id] = {
+                note: '',
+                restDuration: 90,
+                defaultUnit: 'KG',
             }
         })
-        setSetInputs(inputs)
+        setExerciseMeta(meta)
     }
 
     function formatTime(seconds) {
@@ -103,70 +107,13 @@ export default function StartWorkout() {
         return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
     }
 
-    function updateSetInput(seId, field, value) {
-        setSetInputs(prev => ({
-            ...prev,
-            [seId]: { ...prev[seId], [field]: value }
-        }))
-    }
-
-    function updateDrop(seId, dropIndex, field, value) {
-        setSetInputs(prev => {
-            const drops = [...prev[seId].drops]
-            drops[dropIndex] = { ...drops[dropIndex], [field]: value }
-            return { ...prev, [seId]: { ...prev[seId], drops } }
-        })
-    }
-
-    function addDrop(seId) {
-        setSetInputs(prev => {
-            const drops = [...prev[seId].drops, { weight: '', weightUnit: 'KG', reps: '' }]
-            return { ...prev, [seId]: { ...prev[seId], drops } }
-        })
-    }
-
-    function removeDrop(seId, dropIndex) {
-        setSetInputs(prev => {
-            const drops = prev[seId].drops.filter((_, i) => i !== dropIndex)
-            return { ...prev, [seId]: { ...prev[seId], drops } }
-        })
-    }
-
-    async function handleLogSet(se) {
-        const input = setInputs[se.id]
-        if (!input) return
-
-        let entries = []
-
-        if (input.setType === 'NORMAL' || input.setType === 'WARMUP') {
-            if (!input.weight || !input.reps) return
-            entries = [{
-                weight: parseFloat(input.weight),
-                weightUnit: input.weightUnit,
-                reps: parseInt(input.reps),
-                reachedFailure: false
-            }]
-        } else {
-            entries = input.drops
-                .filter(d => d.weight && d.reps)
-                .map(d => ({
-                    weight: parseFloat(d.weight),
-                    weightUnit: d.weightUnit,
-                    reps: parseInt(d.reps),
-                    reachedFailure: false
-                }))
-            if (entries.length === 0) return
-        }
-
+    async function handleLogSet(seId, payload) {
         try {
             const res = await api.post(
-                `/api/workout-sessions/${sessionId}/exercises/${se.id}/sets`,
-                { setType: input.setType, entries }
+                `/api/workout-sessions/${sessionId}/exercises/${seId}/sets`,
+                payload
             )
             setSession(res.data)
-            updateSetInput(se.id, 'weight', '')
-            updateSetInput(se.id, 'reps', '')
-            updateSetInput(se.id, 'drops', [{ weight: '', weightUnit: 'KG', reps: '' }])
         } catch (err) {
             console.error('Failed to log set', err)
         }
@@ -189,30 +136,27 @@ export default function StartWorkout() {
                 `/api/workout-sessions/${sessionId}/exercises`,
                 { exerciseId }
             )
-            setSession(res.data)
             const newSe = res.data.exercises.find(e => e.exerciseId === exerciseId)
             if (newSe) {
-                setSetInputs(prev => ({
+                setExerciseMeta(prev => ({
                     ...prev,
-                    [newSe.id]: {
-                        weight: '',
-                        weightUnit: 'KG',
-                        reps: '',
-                        setType: 'NORMAL',
-                        drops: [{ weight: '', weightUnit: 'KG', reps: '' }]
-                    }
+                    [newSe.id]: { note: '', restDuration: 90, defaultUnit: 'KG' }
                 }))
-                const perfRes = await api.get(
-                    `/api/workout-sessions/exercises/${exerciseId}/last-performance`
-                )
-                if (perfRes.status === 200 && perfRes.data) {
-                    setLastPerformances(prev => ({
-                        ...prev,
-                        [exerciseId]: perfRes.data
-                    }))
-                }
+                try {
+                    const perfRes = await api.get(
+                        `/api/workout-sessions/exercises/${exerciseId}/last-performance`
+                    )
+                    if (perfRes.status === 200 && perfRes.data) {
+                        setLastPerformances(prev => ({
+                            ...prev,
+                            [exerciseId]: perfRes.data
+                        }))
+                    }
+                } catch (_) {}
             }
+            setSession(res.data)
             setShowAddExercise(false)
+            setShowReplaceFor(null)
         } catch (err) {
             console.error('Failed to add exercise', err)
         }
@@ -224,7 +168,7 @@ export default function StartWorkout() {
             await api.post(`/api/workout-sessions/${sessionId}/finish`)
             navigate('/history')
         } catch (err) {
-            console.error('Failed to finish session', err)
+            console.error(err)
         } finally {
             setFinishing(false)
         }
@@ -233,31 +177,31 @@ export default function StartWorkout() {
     async function handleDiscard() {
         try {
             await api.post(`/api/workout-sessions/${sessionId}/cancel`)
-            navigate('/')
-        } catch (err) {
-            console.error('Failed to cancel session', err)
-            navigate('/')
-        }
+        } catch (_) {}
+        navigate('/')
     }
 
-    const SET_TYPES = [
-        { value: 'NORMAL', label: 'Normal' },
-        { value: 'WARMUP', label: 'Warm-up' },
-        { value: 'DROP_SET', label: 'Drop Set' },
-        { value: 'PYRAMID_ASCENDING', label: 'Pyramid ↑' },
-        { value: 'PYRAMID_DESCENDING', label: 'Pyramid ↓' },
-    ]
-
-    const isMultiEntry = (type) =>
-        type === 'DROP_SET' || type === 'PYRAMID_ASCENDING' || type === 'PYRAMID_DESCENDING'
-
-    const availableExercises = exercises.filter(
-        ex => !session?.exercises?.some(se => se.exerciseId === ex.id)
-    )
+    function updateMeta(seId, field, value) {
+        setExerciseMeta(prev => ({
+            ...prev,
+            [seId]: { ...prev[seId], [field]: value }
+        }))
+    }
 
     const totalSets = session?.exercises?.reduce(
         (sum, se) => sum + (se.setGroups?.length || 0), 0
     ) || 0
+
+    const availableExercises = allExercises.filter(
+        ex => !session?.exercises?.some(se => se.exerciseId === ex.id)
+    )
+
+    const replaceAvailable = allExercises.filter(
+        ex => ex.id !== showReplaceFor?.exerciseId &&
+            !session?.exercises?.some(
+                se => se.exerciseId === ex.id && se.id !== showReplaceFor?.id
+            )
+    )
 
     if (loading) {
         return (
@@ -268,16 +212,15 @@ export default function StartWorkout() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 pb-32">
+        <div className="min-h-screen bg-gray-950 pb-36">
 
-            {/* Sticky Header */}
             <div className="sticky top-0 z-40 bg-gray-950 border-b border-gray-800 px-4 py-3">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-white font-bold text-base">
+                        <p className="text-white font-bold text-base leading-tight">
                             {session?.routineName}
                         </p>
-                        <p className="text-orange-400 text-sm font-mono">
+                        <p className="text-orange-400 text-sm font-mono mt-0.5">
                             ⏱ {formatTime(elapsed)}
                         </p>
                     </div>
@@ -291,251 +234,59 @@ export default function StartWorkout() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-
                 {session?.exercises?.length === 0 ? (
-                    <div className="text-center py-12">
+                    <div className="text-center py-16">
                         <p className="text-4xl mb-3">🏋️</p>
-                        <p className="text-gray-500 text-sm">No exercises in this session.</p>
+                        <p className="text-gray-500 text-sm">No exercises yet.</p>
                         <p className="text-gray-600 text-xs mt-1">
-                            Tap + Add Exercise below to get started.
+                            Tap + Add Exercise below.
                         </p>
                     </div>
                 ) : (
-                    session?.exercises?.map((se) => {
-                        const input = setInputs[se.id] || {
-                            weight: '', weightUnit: 'KG', reps: '',
-                            setType: 'NORMAL',
-                            drops: [{ weight: '', weightUnit: 'KG', reps: '' }]
-                        }
-                        const lastPerf = lastPerformances[se.exerciseId]
-                        const multi = isMultiEntry(input.setType)
-
-                        return (
-                            <div
-                                key={se.id}
-                                className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden"
-                            >
-                                {/* Exercise Header */}
-                                <div className="px-4 py-3 border-b border-gray-800">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-white font-semibold text-sm">
-                                                {se.exerciseName}
-                                            </p>
-                                            {se.muscleGroup && (
-                                                <span className="text-xs text-orange-400">
-                          {se.muscleGroup}
-                        </span>
-                                            )}
-                                        </div>
-                                        <span className="text-gray-600 text-xs">
-                      {se.setGroups?.length || 0} sets logged
-                    </span>
-                                    </div>
-                                </div>
-
-                                {/* Last Performance */}
-                                {lastPerf && lastPerf.setGroups?.length > 0 && (
-                                    <div className="px-4 py-3 bg-gray-800/50 border-b border-gray-800">
-                                        <p className="text-gray-500 text-xs font-medium mb-2">
-                                            Last time
-                                        </p>
-                                        {lastPerf.setGroups.map((group, gi) => (
-                                            <div key={gi} className="mb-1">
-                                                {group.entries.map((entry, ei) => (
-                                                    <p key={ei} className="text-gray-400 text-xs">
-                                                        {group.setType !== 'NORMAL' && ei === 0 && (
-                                                            <span className="text-gray-600 mr-1">
-                                {group.setType === 'DROP_SET' ? 'Drop' : 'Step'} —
-                              </span>
-                                                        )}
-                                                        Set {group.setNumber}
-                                                        {group.entries.length > 1 ? `.${ei + 1}` : ''}: {entry.weight}
-                                                        {entry.weightUnit === 'KG' ? 'kg' : 'lbs'} × {entry.reps}
-                                                    </p>
-                                                ))}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Logged Sets */}
-                                {se.setGroups?.length > 0 && (
-                                    <div className="px-4 py-3 border-b border-gray-800 space-y-1">
-                                        {se.setGroups.map((group) => (
-                                            <div
-                                                key={group.id}
-                                                className="flex items-center justify-between"
-                                            >
-                                                <div>
-                                                    {group.entries.map((entry, ei) => (
-                                                        <p key={ei} className="text-gray-300 text-xs">
-                                                            Set {group.setNumber}
-                                                            {group.entries.length > 1 ? `.${ei + 1}` : ''}: {entry.weight}
-                                                            {entry.weightUnit === 'KG' ? 'kg' : 'lbs'} × {entry.reps}
-                                                        </p>
-                                                    ))}
-                                                    {group.setType !== 'NORMAL' && (
-                                                        <span className="text-xs text-orange-400/70">
-                              {SET_TYPES.find(t => t.value === group.setType)?.label}
-                            </span>
-                                                    )}
-                                                </div>
-                                                <button
-                                                    onClick={() => handleDeleteSet(se.id, group.id)}
-                                                    className="text-gray-700 text-xs px-2 py-1 active:text-red-400 transition-colors"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Set Type Selector */}
-                                <div className="px-4 pt-3">
-                                    <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                                        {SET_TYPES.map(type => (
-                                            <button
-                                                key={type.value}
-                                                onClick={() => updateSetInput(se.id, 'setType', type.value)}
-                                                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                                                    input.setType === type.value
-                                                        ? 'bg-orange-500 text-white'
-                                                        : 'bg-gray-800 text-gray-400'
-                                                }`}
-                                            >
-                                                {type.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Set Input */}
-                                <div className="px-4 pt-3 pb-4">
-                                    {!multi ? (
-                                        <div className="flex gap-2 items-end">
-                                            <div className="flex-1">
-                                                <p className="text-gray-600 text-xs mb-1">Weight</p>
-                                                <div className="flex gap-1">
-                                                    <input
-                                                        type="number"
-                                                        value={input.weight}
-                                                        onChange={e => updateSetInput(se.id, 'weight', e.target.value)}
-                                                        placeholder="0"
-                                                        className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
-                                                    />
-                                                    <button
-                                                        onClick={() => updateSetInput(
-                                                            se.id, 'weightUnit',
-                                                            input.weightUnit === 'KG' ? 'LBS' : 'KG'
-                                                        )}
-                                                        className="bg-gray-800 border border-gray-700 text-gray-400 text-xs px-2.5 rounded-xl flex-shrink-0"
-                                                    >
-                                                        {input.weightUnit === 'KG' ? 'kg' : 'lbs'}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="text-gray-600 text-xs mb-1">Reps</p>
-                                                <input
-                                                    type="number"
-                                                    value={input.reps}
-                                                    onChange={e => updateSetInput(se.id, 'reps', e.target.value)}
-                                                    placeholder="0"
-                                                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500"
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={() => handleLogSet(se)}
-                                                className="bg-orange-500 active:bg-orange-600 text-white text-sm font-bold w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
-                                            >
-                                                ✓
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {input.drops.map((drop, di) => (
-                                                <div key={di} className="flex gap-2 items-center">
-                          <span className="text-gray-600 text-xs w-4 flex-shrink-0">
-                            {di + 1}
-                          </span>
-                                                    <input
-                                                        type="number"
-                                                        value={drop.weight}
-                                                        onChange={e => updateDrop(se.id, di, 'weight', e.target.value)}
-                                                        placeholder="Weight"
-                                                        className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
-                                                    />
-                                                    <button
-                                                        onClick={() => updateDrop(
-                                                            se.id, di, 'weightUnit',
-                                                            drop.weightUnit === 'KG' ? 'LBS' : 'KG'
-                                                        )}
-                                                        className="bg-gray-800 border border-gray-700 text-gray-400 text-xs px-2 py-2.5 rounded-xl flex-shrink-0"
-                                                    >
-                                                        {drop.weightUnit === 'KG' ? 'kg' : 'lbs'}
-                                                    </button>
-                                                    <input
-                                                        type="number"
-                                                        value={drop.reps}
-                                                        onChange={e => updateDrop(se.id, di, 'reps', e.target.value)}
-                                                        placeholder="Reps"
-                                                        className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
-                                                    />
-                                                    {input.drops.length > 1 && (
-                                                        <button
-                                                            onClick={() => removeDrop(se.id, di)}
-                                                            className="text-gray-700 text-sm active:text-red-400 flex-shrink-0"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                            <div className="flex gap-2 pt-1">
-                                                <button
-                                                    onClick={() => addDrop(se.id)}
-                                                    className="flex-1 border border-dashed border-gray-700 text-gray-500 text-xs py-2 rounded-xl active:border-gray-500 transition-colors"
-                                                >
-                                                    + Add {input.setType === 'DROP_SET' ? 'Drop' : 'Step'}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleLogSet(se)}
-                                                    className="bg-orange-500 active:bg-orange-600 text-white text-sm font-bold w-11 rounded-xl flex items-center justify-center transition-colors"
-                                                >
-                                                    ✓
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    })
+                    session.exercises.map(se => (
+                        <ExerciseSetCard
+                            key={se.id}
+                            se={se}
+                            lastPerf={lastPerformances[se.exerciseId]}
+                            defaultUnit={exerciseMeta[se.id]?.defaultUnit || 'KG'}
+                            onLogSet={handleLogSet}
+                            onDeleteSet={handleDeleteSet}
+                            onCheckAll={() => {}}
+                            onOpenMenu={() => setMenuExercise(se)}
+                            onRestStart={() => setRestActive(true)}
+                        />
+                    ))
                 )}
 
-                {/* Add Exercise Button */}
                 <button
                     onClick={() => setShowAddExercise(true)}
-                    className="w-full border border-dashed border-gray-700 active:border-gray-600 text-gray-500 active:text-gray-400 text-sm py-4 rounded-2xl transition-colors"
+                    className="w-full border border-dashed border-gray-700 active:border-orange-500/40 text-gray-500 active:text-orange-400 text-sm py-4 rounded-2xl transition-colors"
                 >
                     + Add Exercise
                 </button>
             </div>
 
-            {/* Finish Modal */}
+            {restActive && (
+                <RestTimer
+                    duration={
+                        menuExercise
+                            ? exerciseMeta[menuExercise.id]?.restDuration || 90
+                            : 90
+                    }
+                    onDismiss={() => setRestActive(false)}
+                />
+            )}
+
             {showFinishModal && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center">
+                <div className="fixed inset-0 z-50 flex items-end">
                     <div
                         className="absolute inset-0 bg-black/70"
                         onClick={() => setShowFinishModal(false)}
                     />
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 pb-10 w-full z-10">
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-
                         <div className="text-center mb-6">
-                            <p className="text-4xl mb-3">💪</p>
+                            <p className="text-5xl mb-3">💪</p>
                             <h2 className="text-white font-bold text-xl">Workout Complete</h2>
                             <p className="text-gray-500 text-sm mt-1">
                                 {session?.routineName} · {formatTime(elapsed)}
@@ -544,7 +295,6 @@ export default function StartWorkout() {
                                 {session?.exercises?.length} exercises · {totalSets} sets logged
                             </p>
                         </div>
-
                         <div className="space-y-3">
                             <button
                                 onClick={handleFinish}
@@ -564,48 +314,50 @@ export default function StartWorkout() {
                 </div>
             )}
 
-            {/* Add Exercise Sheet */}
-            {showAddExercise && (
+            {(showAddExercise || showReplaceFor) && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div
                         className="absolute inset-0 bg-black/70"
-                        onClick={() => setShowAddExercise(false)}
+                        onClick={() => {
+                            setShowAddExercise(false)
+                            setShowReplaceFor(null)
+                        }}
                     />
                     <div className="relative bg-gray-900 rounded-t-3xl z-10 flex flex-col max-h-[75vh]">
                         <div className="px-5 pt-5 pb-3 flex-shrink-0">
-                            <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-                            <h2 className="text-white font-semibold text-lg">Add Exercise</h2>
+                            <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
+                            <h2 className="text-white font-semibold text-lg">
+                                {showReplaceFor ? 'Replace Exercise' : 'Add Exercise'}
+                            </h2>
                             <p className="text-gray-500 text-xs mt-1">
-                                Add to current workout session
+                                {showReplaceFor
+                                    ? `Replacing ${showReplaceFor.exerciseName}`
+                                    : 'Add to current session'}
                             </p>
                         </div>
                         <div className="overflow-y-auto px-5 pb-10">
-                            {availableExercises.length === 0 ? (
+                            {(showReplaceFor ? replaceAvailable : availableExercises).length === 0 ? (
                                 <div className="text-center py-8">
-                                    <p className="text-gray-500 text-sm">
-                                        All exercises already added.
-                                    </p>
+                                    <p className="text-gray-500 text-sm">No exercises available.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2 mt-2">
-                                    {availableExercises.map(exercise => (
+                                    {(showReplaceFor ? replaceAvailable : availableExercises).map(ex => (
                                         <button
-                                            key={exercise.id}
-                                            onClick={() => handleAddExercise(exercise.id)}
+                                            key={ex.id}
+                                            onClick={() => handleAddExercise(ex.id)}
                                             className="w-full bg-gray-800 active:bg-gray-700 border border-gray-700 rounded-xl px-4 py-3 text-left transition-colors"
                                         >
-                                            <p className="text-white text-sm font-medium">
-                                                {exercise.name}
-                                            </p>
+                                            <p className="text-white text-sm font-medium">{ex.name}</p>
                                             <div className="flex gap-2 mt-1">
-                                                {exercise.muscleGroup && (
+                                                {ex.muscleGroup && (
                                                     <span className="text-xs text-orange-400">
-                            {exercise.muscleGroup}
+                            {ex.muscleGroup}
                           </span>
                                                 )}
-                                                {exercise.equipment && (
+                                                {ex.equipment && (
                                                     <span className="text-xs text-gray-500">
-                            {exercise.equipment}
+                            {ex.equipment}
                           </span>
                                                 )}
                                             </div>
@@ -616,6 +368,26 @@ export default function StartWorkout() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {menuExercise && (
+                <ExerciseMenu
+                    exercise={menuExercise}
+                    note={exerciseMeta[menuExercise.id]?.note || ''}
+                    restDuration={exerciseMeta[menuExercise.id]?.restDuration || 90}
+                    defaultUnit={exerciseMeta[menuExercise.id]?.defaultUnit || 'KG'}
+                    onClose={() => setMenuExercise(null)}
+                    onNoteChange={val => {
+                        updateMeta(menuExercise.id, 'note', val)
+                        setMenuExercise(null)
+                    }}
+                    onRestChange={val => updateMeta(menuExercise.id, 'restDuration', val)}
+                    onUnitChange={val => updateMeta(menuExercise.id, 'defaultUnit', val)}
+                    onReplace={() => {
+                        setShowReplaceFor(menuExercise)
+                        setMenuExercise(null)
+                    }}
+                />
             )}
         </div>
     )
