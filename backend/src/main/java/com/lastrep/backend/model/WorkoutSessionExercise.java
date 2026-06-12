@@ -7,6 +7,9 @@ import java.util.List;
 @Entity
 @Table(name = "workout_session_exercises")
 public class WorkoutSessionExercise {
+    private Integer targetSets;
+    private Integer targetMinReps;
+    private Integer targetMaxReps;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,4 +49,13 @@ public class WorkoutSessionExercise {
 
     public List<WorkoutSetGroup> getSetGroups() { return setGroups; }
     public void setSetGroups(List<WorkoutSetGroup> setGroups) { this.setGroups = setGroups; }
+
+    public Integer getTargetSets() { return targetSets; }
+    public void setTargetSets(Integer targetSets) { this.targetSets = targetSets; }
+
+    public Integer getTargetMinReps() { return targetMinReps; }
+    public void setTargetMinReps(Integer targetMinReps) { this.targetMinReps = targetMinReps; }
+
+    public Integer getTargetMaxReps() { return targetMaxReps; }
+    public void setTargetMaxReps(Integer targetMaxReps) { this.targetMaxReps = targetMaxReps; }
 }
