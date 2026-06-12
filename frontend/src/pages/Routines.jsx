@@ -101,7 +101,7 @@ export default function Routines() {
 
             <div className="px-4 py-6">
 
-
+                {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Routines</h1>
