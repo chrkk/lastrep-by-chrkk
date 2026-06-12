@@ -5,6 +5,7 @@ import com.lastrep.backend.model.*;
 import com.lastrep.backend.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.lastrep.backend.model.WeightUnit;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -99,6 +100,8 @@ public class WorkoutSessionService {
             entry.setSetGroup(group);
             entry.setEntryNumber(entryNum++);
             entry.setWeight(entryReq.getWeight());
+            entry.setWeightUnit(entryReq.getWeightUnit() != null
+                    ? entryReq.getWeightUnit() : WeightUnit.KG);
             entry.setReps(entryReq.getReps());
             entry.setReachedFailure(entryReq.getReachedFailure() != null
                     ? entryReq.getReachedFailure() : false);
