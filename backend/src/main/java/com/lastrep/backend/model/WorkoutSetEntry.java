@@ -18,6 +18,11 @@ public class WorkoutSetEntry {
     private Integer entryNumber;
 
     private Double weight;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private WeightUnit weightUnit = WeightUnit.KG;
+
     private Integer reps;
     private Boolean reachedFailure = false;
     private Integer restSeconds;
@@ -34,6 +39,9 @@ public class WorkoutSetEntry {
 
     public Double getWeight() { return weight; }
     public void setWeight(Double weight) { this.weight = weight; }
+
+    public WeightUnit getWeightUnit() { return weightUnit; }
+    public void setWeightUnit(WeightUnit weightUnit) { this.weightUnit = weightUnit; }
 
     public Integer getReps() { return reps; }
     public void setReps(Integer reps) { this.reps = reps; }
