@@ -101,7 +101,7 @@ export default function Routines() {
 
             <div className="px-4 py-6">
 
-                {/* Header */}
+
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Routines</h1>
@@ -115,7 +115,7 @@ export default function Routines() {
                     </button>
                 </div>
 
-                {/* Routine List */}
+
                 {loading ? (
                     <div className="text-gray-600 text-sm text-center py-16">
                         Loading...
@@ -181,7 +181,7 @@ export default function Routines() {
                 )}
             </div>
 
-            {/* Bottom Sheet Modal */}
+
             {showForm && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div

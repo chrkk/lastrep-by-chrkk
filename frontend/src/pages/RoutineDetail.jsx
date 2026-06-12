@@ -97,7 +97,7 @@ export default function RoutineDetail() {
         }
     }
 
-    // Filter out exercises already in the routine
+
     const availableExercises = exercises.filter(
         ex => !routine?.exercises?.some(re => re.exerciseId === ex.id)
     )
@@ -126,7 +126,7 @@ export default function RoutineDetail() {
 
             <div className="px-4 py-6">
 
-                {/* Header */}
+
                 <div className="mb-6">
                     <button
                         onClick={() => navigate('/routines')}
@@ -145,7 +145,7 @@ export default function RoutineDetail() {
                     </p>
                 </div>
 
-                {/* Start Workout Button */}
+
                 {routine.exercises?.length > 0 && (
                     <button
                         onClick={() => navigate(`/workout/new?routineId=${routine.id}`)}
@@ -155,7 +155,7 @@ export default function RoutineDetail() {
                     </button>
                 )}
 
-                {/* Exercise List */}
+
                 {routine.exercises?.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-4xl mb-3">🏋️</p>
@@ -211,7 +211,7 @@ export default function RoutineDetail() {
                     </div>
                 )}
 
-                {/* Add Exercise Button */}
+
                 <button
                     onClick={openAddExercise}
                     className="w-full border border-dashed border-gray-700 active:border-gray-600 text-gray-500 active:text-gray-400 text-sm py-4 rounded-2xl transition-colors"
@@ -220,7 +220,7 @@ export default function RoutineDetail() {
                 </button>
             </div>
 
-            {/* Exercise Picker Sheet */}
+
             {showAddExercise && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div
@@ -238,7 +238,7 @@ export default function RoutineDetail() {
                             </p>
                         </div>
 
-                        {/* Scrollable exercise list */}
+
                         <div className="overflow-y-auto px-5 pb-10">
                             {availableExercises.length === 0 ? (
                                 <div className="text-center py-8">
@@ -278,7 +278,7 @@ export default function RoutineDetail() {
                 </div>
             )}
 
-            {/* Target Sets/Reps Sheet */}
+
             {showTargetForm && selectedExercise && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div
@@ -302,7 +302,7 @@ export default function RoutineDetail() {
                         )}
 
                         <form onSubmit={handleAddExercise} className="space-y-4">
-                            {/* Target Sets */}
+
                             <div>
                                 <label className="block text-gray-400 text-sm mb-3">
                                     Target sets
@@ -325,7 +325,7 @@ export default function RoutineDetail() {
                                 </div>
                             </div>
 
-                            {/* Rep Range */}
+
                             <div>
                                 <label className="block text-gray-400 text-sm mb-3">
                                     Rep range
