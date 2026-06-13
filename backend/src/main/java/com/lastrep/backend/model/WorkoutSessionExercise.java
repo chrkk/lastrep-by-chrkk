@@ -1,18 +1,23 @@
 package com.lastrep.backend.model;
 
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "routine_exercises")
-public class RoutineExercise {
+@Table(name = "workout_session_exercises")
+public class WorkoutSessionExercise {
+    private Integer targetSets;
+    private Integer targetMinReps;
+    private Integer targetMaxReps;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "routine_id", nullable = false)
-    private Routine routine;
+    @JoinColumn(name = "workout_session_id", nullable = false)
+    private WorkoutSession workoutSession;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "exercise_id", nullable = false)
@@ -21,26 +26,33 @@ public class RoutineExercise {
     @Column(nullable = false)
     private Integer orderIndex = 0;
 
-    private Integer targetSets;
-    private Integer targetMinReps;
-    private Integer targetMaxReps;
-
+    private String notes;
     private Integer restSeconds = 90;
 
     public Integer getRestSeconds() { return restSeconds; }
     public void setRestSeconds(Integer restSeconds) { this.restSeconds = restSeconds; }
 
+    @OneToMany(mappedBy = "sessionExercise", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("setNumber ASC")
+    private List<WorkoutSetGroup> setGroups = new ArrayList<>();
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Routine getRoutine() { return routine; }
-    public void setRoutine(Routine routine) { this.routine = routine; }
+    public WorkoutSession getWorkoutSession() { return workoutSession; }
+    public void setWorkoutSession(WorkoutSession workoutSession) { this.workoutSession = workoutSession; }
 
     public Exercise getExercise() { return exercise; }
     public void setExercise(Exercise exercise) { this.exercise = exercise; }
 
     public Integer getOrderIndex() { return orderIndex; }
     public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
+    public List<WorkoutSetGroup> getSetGroups() { return setGroups; }
+    public void setSetGroups(List<WorkoutSetGroup> setGroups) { this.setGroups = setGroups; }
 
     public Integer getTargetSets() { return targetSets; }
     public void setTargetSets(Integer targetSets) { this.targetSets = targetSets; }

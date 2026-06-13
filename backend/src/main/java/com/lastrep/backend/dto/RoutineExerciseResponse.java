@@ -13,6 +13,7 @@ public class RoutineExerciseResponse {
     private Integer targetSets;
     private Integer targetMinReps;
     private Integer targetMaxReps;
+    private Integer restSeconds;
 
     public RoutineExerciseResponse(RoutineExercise re) {
         this.id = re.getId();
@@ -24,6 +25,7 @@ public class RoutineExerciseResponse {
         this.targetSets = re.getTargetSets();
         this.targetMinReps = re.getTargetMinReps();
         this.targetMaxReps = re.getTargetMaxReps();
+        this.restSeconds = re.getRestSeconds();
     }
 
     public Long getId() { return id; }
@@ -32,6 +34,7 @@ public class RoutineExerciseResponse {
     public String getMuscleGroup() { return muscleGroup; }
     public String getEquipment() { return equipment; }
     public Integer getOrderIndex() { return orderIndex; }
+    public Integer getRestSeconds() { return restSeconds; }
     public Integer getTargetSets() { return targetSets; }
     public Integer getTargetMinReps() { return targetMinReps; }
     public Integer getTargetMaxReps() { return targetMaxReps; }

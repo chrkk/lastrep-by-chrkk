@@ -9,6 +9,7 @@ import RoutineDetail from './pages/RoutineDetail'
 import StartWorkout from './pages/StartWorkout'
 import WorkoutHistory from './pages/WorkoutHistory'
 import ExerciseHistory from './pages/ExerciseHistory'
+import SelectRoutine from './pages/SelectRoutine'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -16,11 +17,8 @@ function App() {
         <MobileOnly>
             <BrowserRouter>
                 <Routes>
-                    {/* Public routes */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
-
-                    {/* Protected routes */}
                     <Route path="/" element={
                         <ProtectedRoute><Dashboard /></ProtectedRoute>
                     } />
@@ -32,6 +30,9 @@ function App() {
                     } />
                     <Route path="/routines/:id" element={
                         <ProtectedRoute><RoutineDetail /></ProtectedRoute>
+                    } />
+                    <Route path="/select-routine" element={
+                        <ProtectedRoute><SelectRoutine /></ProtectedRoute>
                     } />
                     <Route path="/workout/:sessionId" element={
                         <ProtectedRoute><StartWorkout /></ProtectedRoute>

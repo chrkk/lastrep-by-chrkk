@@ -1,0 +1,48 @@
+package com.lastrep.backend.dto;
+
+import com.lastrep.backend.model.WorkoutSessionExercise;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class SessionExerciseResponse {
+    private Long id;
+    private Long exerciseId;
+    private String exerciseName;
+    private String muscleGroup;
+    private String equipment;
+    private Integer orderIndex;
+    private Integer targetSets;
+    private Integer targetMinReps;
+    private Integer targetMaxReps;
+    private Integer restSeconds;
+    private List<SetGroupResponse> setGroups;
+
+    public SessionExerciseResponse(WorkoutSessionExercise se) {
+        this.id = se.getId();
+        this.exerciseId = se.getExercise().getId();
+        this.exerciseName = se.getExercise().getName();
+        this.muscleGroup = se.getExercise().getMuscleGroup();
+        this.equipment = se.getExercise().getEquipment();
+        this.orderIndex = se.getOrderIndex();
+        this.targetSets = se.getTargetSets();
+        this.targetMinReps = se.getTargetMinReps();
+        this.targetMaxReps = se.getTargetMaxReps();
+        this.restSeconds = se.getRestSeconds();
+        this.setGroups = se.getSetGroups()
+                .stream()
+                .map(SetGroupResponse::new)
+                .collect(Collectors.toList());
+    }
+
+    public Long getId() { return id; }
+    public Long getExerciseId() { return exerciseId; }
+    public String getExerciseName() { return exerciseName; }
+    public String getMuscleGroup() { return muscleGroup; }
+    public String getEquipment() { return equipment; }
+    public Integer getRestSeconds() { return restSeconds; }
+    public Integer getOrderIndex() { return orderIndex; }
+    public Integer getTargetSets() { return targetSets; }
+    public Integer getTargetMinReps() { return targetMinReps; }
+    public Integer getTargetMaxReps() { return targetMaxReps; }
+    public List<SetGroupResponse> getSetGroups() { return setGroups; }
+}

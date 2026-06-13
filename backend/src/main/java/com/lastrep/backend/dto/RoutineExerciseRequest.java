@@ -6,6 +6,10 @@ public class RoutineExerciseRequest {
     private Integer targetSets;
     private Integer targetMinReps;
     private Integer targetMaxReps;
+    private Integer restSeconds = 90;
+
+    public Integer getRestSeconds() { return restSeconds; }
+    public void setRestSeconds(Integer restSeconds) { this.restSeconds = restSeconds; }
 
     public Long getExerciseId() { return exerciseId; }
     public void setExerciseId(Long exerciseId) { this.exerciseId = exerciseId; }
