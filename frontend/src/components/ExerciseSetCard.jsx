@@ -3,7 +3,6 @@ import SetRow from './SetRow'
 
 const SET_TYPES = [
     { value: 'NORMAL', label: 'Normal' },
-    { value: 'WARMUP', label: 'Warm-up' },
     { value: 'DROP_SET', label: 'Drop Set' },
     { value: 'PYRAMID_ASCENDING', label: 'Pyramid ↑' },
     { value: 'PYRAMID_DESCENDING', label: 'Pyramid ↓' },
@@ -279,11 +278,6 @@ export default function ExerciseSetCard({
                 </div>
             ) : (
                 <div className="px-4 pt-3 pb-2 space-y-2">
-                    {setType === 'WARMUP' && (
-                        <p className="text-gray-600 text-xs italic mb-1">
-                            Warm-up sets are logged but excluded from volume and PR calculations.
-                        </p>
-                    )}
                     {dropRows.map((drop, di) => (
                         <div key={di} className="flex items-center gap-2">
               <span className="text-gray-600 text-xs w-4 text-center flex-shrink-0">
