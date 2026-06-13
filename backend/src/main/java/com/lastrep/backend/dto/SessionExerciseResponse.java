@@ -14,6 +14,7 @@ public class SessionExerciseResponse {
     private Integer targetSets;
     private Integer targetMinReps;
     private Integer targetMaxReps;
+    private Integer restSeconds;
     private List<SetGroupResponse> setGroups;
 
     public SessionExerciseResponse(WorkoutSessionExercise se) {
@@ -26,6 +27,7 @@ public class SessionExerciseResponse {
         this.targetSets = se.getTargetSets();
         this.targetMinReps = se.getTargetMinReps();
         this.targetMaxReps = se.getTargetMaxReps();
+        this.restSeconds = se.getRestSeconds();
         this.setGroups = se.getSetGroups()
                 .stream()
                 .map(SetGroupResponse::new)
@@ -37,6 +39,7 @@ public class SessionExerciseResponse {
     public String getExerciseName() { return exerciseName; }
     public String getMuscleGroup() { return muscleGroup; }
     public String getEquipment() { return equipment; }
+    public Integer getRestSeconds() { return restSeconds; }
     public Integer getOrderIndex() { return orderIndex; }
     public Integer getTargetSets() { return targetSets; }
     public Integer getTargetMinReps() { return targetMinReps; }

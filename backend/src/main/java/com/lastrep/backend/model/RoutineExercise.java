@@ -25,6 +25,11 @@ public class RoutineExercise {
     private Integer targetMinReps;
     private Integer targetMaxReps;
 
+    private Integer restSeconds = 90;
+
+    public Integer getRestSeconds() { return restSeconds; }
+    public void setRestSeconds(Integer restSeconds) { this.restSeconds = restSeconds; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

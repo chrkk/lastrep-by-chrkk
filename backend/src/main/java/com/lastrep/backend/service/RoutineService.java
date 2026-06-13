@@ -92,6 +92,7 @@ public class RoutineService {
         re.setTargetSets(request.getTargetSets());
         re.setTargetMinReps(request.getTargetMinReps());
         re.setTargetMaxReps(request.getTargetMaxReps());
+        re.setRestSeconds(request.getRestSeconds() != null ? request.getRestSeconds() : 90);
 
         routine.getRoutineExercises().add(re);
         return new RoutineResponse(routineRepository.save(routine));

@@ -55,6 +55,7 @@ public class WorkoutSessionService {
             se.setWorkoutSession(session);
             se.setExercise(re.getExercise());
             se.setOrderIndex(index++);
+            se.setRestSeconds(re.getRestSeconds() != null ? re.getRestSeconds() : 90);
             session.getSessionExercises().add(se);
         }
 

@@ -27,6 +27,10 @@ public class WorkoutSessionExercise {
     private Integer orderIndex = 0;
 
     private String notes;
+    private Integer restSeconds = 90;
+
+    public Integer getRestSeconds() { return restSeconds; }
+    public void setRestSeconds(Integer restSeconds) { this.restSeconds = restSeconds; }
 
     @OneToMany(mappedBy = "sessionExercise", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("setNumber ASC")
