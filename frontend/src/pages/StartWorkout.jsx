@@ -123,6 +123,7 @@ export default function StartWorkout() {
                 payload
             )
             setSession(res.data)
+            return res.data
         } catch (err) {
             console.error('Failed to log set', err)
         }
