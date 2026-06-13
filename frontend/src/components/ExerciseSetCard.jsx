@@ -31,6 +31,7 @@ export default function ExerciseSetCard({
                 weightUnit: lastEntry?.weightUnit || defaultUnit || 'KG',
                 reps: lastEntry ? String(lastEntry.reps) : '',
                 isChecked: false,
+                restSeconds: restDuration || 90,
             })
         }
         return rows
@@ -107,7 +108,7 @@ export default function ExerciseSetCard({
             setRows(prev => prev.map((r, i) =>
                 i === index ? { ...r, isChecked: true } : r
             ))
-            if (!noRest) onRestStart(restDuration || 90)
+            if (!noRest) onRestStart(row.restSeconds || restDuration || 90)
         } finally {
             setCheckingIndex(null)
         }
@@ -144,7 +145,10 @@ export default function ExerciseSetCard({
                     idx === i ? { ...row, isChecked: true } : row
                 ))
             }
-            if (!noRest && valid.length > 0) onRestStart(restDuration || 90)
+            if (!noRest && valid.length > 0) {
+                const lastRow = valid[valid.length - 1].r
+                onRestStart(lastRow.restSeconds || restDuration || 90)
+            }
         } finally {
             setCheckingAll(false)
         }
@@ -172,6 +176,7 @@ export default function ExerciseSetCard({
             weightUnit: lastRow?.weightUnit || defaultUnit || 'KG',
             reps: lastRow?.reps || '',
             isChecked: false,
+            restSeconds: restDuration || 90,
         }])
     }
 
@@ -232,6 +237,7 @@ export default function ExerciseSetCard({
                             reps={row.reps}
                             isChecked={row.isChecked}
                             isLoading={checkingIndex === i || checkingAll}
+                            restSeconds={row.restSeconds}
                             onWeightChange={val => updateRow(i, 'weight', val)}
                             onRepsChange={val => updateRow(i, 'reps', val)}
                             onUnitToggle={() => updateRow(i, 'weightUnit',
@@ -239,6 +245,7 @@ export default function ExerciseSetCard({
                             )}
                             onToggleCheck={() => handleToggleCheck(i)}
                             onDelete={() => handleToggleCheck(i)}
+                            onRestChange={val => updateRow(i, 'restSeconds', val)}
                         />
                     ))}
                 </div>
