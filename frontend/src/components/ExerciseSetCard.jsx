@@ -15,7 +15,6 @@ export default function ExerciseSetCard({
                                             onLogSet,
                                             onDeleteSet,
                                             onOpenMenu,
-                                            onRestStart,
                                             defaultUnit,
                                             restDuration,
                                         }) {
@@ -45,6 +44,7 @@ export default function ExerciseSetCard({
     ])
     const [checkingIndex, setCheckingIndex] = useState(null)
     const [checkingAll, setCheckingAll] = useState(false)
+    const [activeTimerIndex, setActiveTimerIndex] = useState(null)
 
     useEffect(() => {
         setRows(prev => prev.map(r =>
@@ -53,13 +53,7 @@ export default function ExerciseSetCard({
         setDropRows(prev => prev.map(d => ({ ...d, weightUnit: defaultUnit || 'KG' })))
     }, [defaultUnit])
 
-    const isMulti = setType === 'DROP_SET' ||
-        setType === 'PYRAMID_ASCENDING' ||
-        setType === 'PYRAMID_DESCENDING'
-
-    const noRest = setType === 'DROP_SET' ||
-        setType === 'PYRAMID_ASCENDING' ||
-        setType === 'PYRAMID_DESCENDING'
+    const noRest = setType === 'DROP_SET'
 
     function updateRow(index, field, value) {
         setRows(prev => prev.map((r, i) =>
@@ -91,6 +85,7 @@ export default function ExerciseSetCard({
         if (row.isChecked) {
             if (!row.setGroupId) return
             setCheckingIndex(index)
+            if (activeTimerIndex === index) setActiveTimerIndex(null)
             try {
                 await onDeleteSet(se.id, row.setGroupId)
                 setRows(prev => prev.map((r, i) =>
@@ -109,7 +104,7 @@ export default function ExerciseSetCard({
         setCheckingIndex(index)
         try {
             const res = await onLogSet(se.id, {
-                setType: 'NORMAL',
+                setType,
                 entries: [{
                     weight: parseFloat(weightVal),
                     weightUnit: row.weightUnit,
@@ -126,7 +121,10 @@ export default function ExerciseSetCard({
                     ? { ...r, isChecked: true, setGroupId: newGroup?.id || null }
                     : r
             ))
-            if (!noRest) onRestStart(row.restSeconds || restDuration || 90)
+
+            if (!noRest) {
+                setActiveTimerIndex(index)
+            }
         } finally {
             setCheckingIndex(null)
         }
@@ -168,8 +166,8 @@ export default function ExerciseSetCard({
                 ))
             }
             if (!noRest && valid.length > 0) {
-                const lastRow = valid[valid.length - 1].r
-                onRestStart(lastRow.restSeconds || restDuration || 90)
+                const lastValidIndex = valid[valid.length - 1].i
+                setActiveTimerIndex(lastValidIndex)
             }
         } finally {
             setCheckingAll(false)
@@ -202,6 +200,10 @@ export default function ExerciseSetCard({
             restSeconds: restDuration || 90,
         }])
     }
+
+    const isMulti = setType === 'DROP_SET' ||
+        setType === 'PYRAMID_ASCENDING' ||
+        setType === 'PYRAMID_DESCENDING'
 
     const allChecked = rows.length > 0 && rows.every(r => r.isChecked)
     const hasValidUnchecked = rows.some((r, i) =>
@@ -261,6 +263,8 @@ export default function ExerciseSetCard({
                             isChecked={row.isChecked}
                             isLoading={checkingIndex === i || checkingAll}
                             restSeconds={row.restSeconds}
+                            isTimerActive={activeTimerIndex === i}
+                            showRestTimer={true}
                             onWeightChange={val => updateRow(i, 'weight', val)}
                             onRepsChange={val => updateRow(i, 'reps', val)}
                             onUnitToggle={() => updateRow(i, 'weightUnit',
@@ -269,11 +273,17 @@ export default function ExerciseSetCard({
                             onToggleCheck={() => handleToggleCheck(i)}
                             onDelete={() => handleToggleCheck(i)}
                             onRestChange={val => updateRow(i, 'restSeconds', val)}
+                            onTimerDone={() => setActiveTimerIndex(null)}
                         />
                     ))}
                 </div>
             ) : (
                 <div className="px-4 pt-3 pb-2 space-y-2">
+                    {setType === 'WARMUP' && (
+                        <p className="text-gray-600 text-xs italic mb-1">
+                            Warm-up sets are logged but excluded from volume and PR calculations.
+                        </p>
+                    )}
                     {dropRows.map((drop, di) => (
                         <div key={di} className="flex items-center gap-2">
               <span className="text-gray-600 text-xs w-4 text-center flex-shrink-0">
