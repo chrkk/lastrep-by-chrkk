@@ -144,7 +144,7 @@ export default function ExerciseSetCard({
                     idx === i ? { ...row, isChecked: true } : row
                 ))
             }
-            if (!noRest && valid.length > 0) onRestStart()
+            if (!noRest && valid.length > 0) onRestStart(restDuration || 90)
         } finally {
             setCheckingAll(false)
         }

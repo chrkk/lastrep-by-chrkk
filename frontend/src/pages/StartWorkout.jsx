@@ -34,7 +34,7 @@ export default function StartWorkout() {
         if (!session) return
         timerRef.current = setInterval(() => {
             const start = new Date(session.createdAt)
-            setElapsed(Math.floor((now() - start) / 1000))
+            setElapsed(Math.floor((new Date() - start) / 1000))
         }, 1000)
         return () => clearInterval(timerRef.current)
     }, [session?.id])
@@ -45,8 +45,6 @@ export default function StartWorkout() {
         document.body.style.overflow = open ? 'hidden' : ''
         return () => { document.body.style.overflow = '' }
     }, [showFinishModal, showAddExercise, menuExercise, showReplaceFor])
-
-    function now() { return new Date() }
 
     async function fetchSession() {
         try {
@@ -107,6 +105,15 @@ export default function StartWorkout() {
             return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
         }
         return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    }
+
+    function getIncompleteCount() {
+        if (!session) return 0
+        return session.exercises.reduce((sum, se) => {
+            const target = se.targetSets || 3
+            const logged = se.setGroups?.length || 0
+            return sum + Math.max(0, target - logged)
+        }, 0)
     }
 
     async function handleLogSet(seId, payload) {
@@ -171,6 +178,40 @@ export default function StartWorkout() {
             navigate('/history')
         } catch (err) {
             console.error(err)
+        } finally {
+            setFinishing(false)
+        }
+    }
+
+    async function handleAutoFinish() {
+        setFinishing(true)
+        try {
+            for (const se of session.exercises) {
+                const target = se.targetSets || 3
+                const logged = se.setGroups?.length || 0
+                if (logged >= target) continue
+                const lastPerf = lastPerformances[se.exerciseId]
+                for (let i = logged; i < target; i++) {
+                    const lastEntry = lastPerf?.setGroups?.[i]?.entries?.[0]
+                    if (!lastEntry) continue
+                    await api.post(
+                        `/api/workout-sessions/${sessionId}/exercises/${se.id}/sets`,
+                        {
+                            setType: 'NORMAL',
+                            entries: [{
+                                weight: lastEntry.weight,
+                                weightUnit: lastEntry.weightUnit,
+                                reps: lastEntry.reps,
+                                reachedFailure: false,
+                            }]
+                        }
+                    )
+                }
+            }
+            await api.post(`/api/workout-sessions/${sessionId}/finish`)
+            navigate('/history')
+        } catch (err) {
+            console.error('Auto-finish failed', err)
         } finally {
             setFinishing(false)
         }
@@ -288,31 +329,72 @@ export default function StartWorkout() {
                     />
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 pb-10 w-full z-10">
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-                        <div className="text-center mb-6">
-                            <p className="text-5xl mb-3">💪</p>
-                            <h2 className="text-white font-bold text-xl">Workout Complete</h2>
-                            <p className="text-gray-500 text-sm mt-1">
-                                {session?.routineName} · {formatTime(elapsed)}
-                            </p>
-                            <p className="text-gray-600 text-xs mt-1">
-                                {session?.exercises?.length} exercises · {totalSets} sets logged
-                            </p>
-                        </div>
-                        <div className="space-y-3">
-                            <button
-                                onClick={handleFinish}
-                                disabled={finishing}
-                                className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-semibold py-4 rounded-2xl transition-colors"
-                            >
-                                {finishing ? 'Saving...' : 'Save Workout'}
-                            </button>
-                            <button
-                                onClick={handleDiscard}
-                                className="w-full bg-gray-800 active:bg-gray-700 text-gray-400 font-medium py-4 rounded-2xl transition-colors"
-                            >
-                                Discard Workout
-                            </button>
-                        </div>
+
+                        {getIncompleteCount() > 0 ? (
+                            <>
+                                <div className="text-center mb-6">
+                                    <p className="text-4xl mb-3">⚠️</p>
+                                    <h2 className="text-white font-bold text-xl">
+                                        Not quite done
+                                    </h2>
+                                    <p className="text-gray-500 text-sm mt-1">
+                                        {getIncompleteCount()} set{getIncompleteCount() !== 1 ? 's' : ''} not logged yet
+                                    </p>
+                                </div>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={handleAutoFinish}
+                                        disabled={finishing}
+                                        className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-semibold py-4 rounded-2xl transition-colors"
+                                    >
+                                        {finishing ? 'Saving...' : 'Auto-fill remaining sets'}
+                                    </button>
+                                    <button
+                                        onClick={handleFinish}
+                                        disabled={finishing}
+                                        className="w-full bg-gray-800 active:bg-gray-700 disabled:opacity-50 text-gray-300 font-medium py-4 rounded-2xl transition-colors"
+                                    >
+                                        Finish as is
+                                    </button>
+                                    <button
+                                        onClick={() => setShowFinishModal(false)}
+                                        className="w-full text-gray-600 text-sm py-3"
+                                    >
+                                        Keep going
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-center mb-6">
+                                    <p className="text-5xl mb-3">💪</p>
+                                    <h2 className="text-white font-bold text-xl">
+                                        Workout Complete
+                                    </h2>
+                                    <p className="text-gray-500 text-sm mt-1">
+                                        {session?.routineName} · {formatTime(elapsed)}
+                                    </p>
+                                    <p className="text-gray-600 text-xs mt-1">
+                                        {session?.exercises?.length} exercises · {totalSets} sets logged
+                                    </p>
+                                </div>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={handleFinish}
+                                        disabled={finishing}
+                                        className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-semibold py-4 rounded-2xl transition-colors"
+                                    >
+                                        {finishing ? 'Saving...' : 'Save Workout'}
+                                    </button>
+                                    <button
+                                        onClick={handleDiscard}
+                                        className="w-full bg-gray-800 active:bg-gray-700 text-gray-400 font-medium py-4 rounded-2xl transition-colors"
+                                    >
+                                        Discard Workout
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
@@ -341,7 +423,9 @@ export default function StartWorkout() {
                         <div className="overflow-y-auto px-5 pb-10">
                             {(showReplaceFor ? replaceAvailable : availableExercises).length === 0 ? (
                                 <div className="text-center py-8">
-                                    <p className="text-gray-500 text-sm">No exercises available.</p>
+                                    <p className="text-gray-500 text-sm">
+                                        No exercises available.
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-2 mt-2">
@@ -351,17 +435,19 @@ export default function StartWorkout() {
                                             onClick={() => handleAddExercise(ex.id)}
                                             className="w-full bg-gray-800 active:bg-gray-700 border border-gray-700 rounded-xl px-4 py-3 text-left transition-colors"
                                         >
-                                            <p className="text-white text-sm font-medium">{ex.name}</p>
+                                            <p className="text-white text-sm font-medium">
+                                                {ex.name}
+                                            </p>
                                             <div className="flex gap-2 mt-1">
                                                 {ex.muscleGroup && (
                                                     <span className="text-xs text-orange-400">
-                            {ex.muscleGroup}
-                          </span>
+                                                        {ex.muscleGroup}
+                                                    </span>
                                                 )}
                                                 {ex.equipment && (
                                                     <span className="text-xs text-gray-500">
-                            {ex.equipment}
-                          </span>
+                                                        {ex.equipment}
+                                                    </span>
                                                 )}
                                             </div>
                                         </button>
