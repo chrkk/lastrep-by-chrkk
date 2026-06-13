@@ -90,7 +90,7 @@ export default function StartWorkout() {
         sessionExercises.forEach(se => {
             meta[se.id] = {
                 note: '',
-                restDuration: 90,
+                restDuration: se.restSeconds || 90,
                 defaultUnit: 'KG',
             }
         })
