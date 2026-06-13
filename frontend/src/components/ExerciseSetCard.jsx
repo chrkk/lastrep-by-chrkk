@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SetRow from './SetRow'
 
 const SET_TYPES = [
@@ -31,6 +31,7 @@ export default function ExerciseSetCard({
                 weightUnit: lastEntry?.weightUnit || defaultUnit || 'KG',
                 reps: lastEntry ? String(lastEntry.reps) : '',
                 isChecked: false,
+                setGroupId: null,
                 restSeconds: restDuration || 90,
             })
         }
@@ -45,6 +46,13 @@ export default function ExerciseSetCard({
     const [checkingIndex, setCheckingIndex] = useState(null)
     const [checkingAll, setCheckingAll] = useState(false)
 
+    useEffect(() => {
+        setRows(prev => prev.map(r =>
+            r.isChecked ? r : { ...r, weightUnit: defaultUnit || 'KG' }
+        ))
+        setDropRows(prev => prev.map(d => ({ ...d, weightUnit: defaultUnit || 'KG' })))
+    }, [defaultUnit])
+
     const isMulti = setType === 'DROP_SET' ||
         setType === 'PYRAMID_ASCENDING' ||
         setType === 'PYRAMID_DESCENDING'
@@ -54,19 +62,25 @@ export default function ExerciseSetCard({
         setType === 'PYRAMID_DESCENDING'
 
     function updateRow(index, field, value) {
-        setRows(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r))
+        setRows(prev => prev.map((r, i) =>
+            i === index ? { ...r, [field]: value } : r
+        ))
     }
 
     function updateDrop(index, field, value) {
-        setDropRows(prev => prev.map((d, i) => i === index ? { ...d, [field]: value } : d))
+        setDropRows(prev => prev.map((d, i) =>
+            i === index ? { ...d, [field]: value } : d
+        ))
     }
 
     function resolveWeight(row, index) {
-        return row.weight || String(lastPerf?.setGroups?.[index]?.entries?.[0]?.weight || '')
+        return row.weight ||
+            String(lastPerf?.setGroups?.[index]?.entries?.[0]?.weight || '')
     }
 
     function resolveReps(row, index) {
-        return row.reps || String(lastPerf?.setGroups?.[index]?.entries?.[0]?.reps || '')
+        return row.reps ||
+            String(lastPerf?.setGroups?.[index]?.entries?.[0]?.reps || '')
     }
 
     async function handleToggleCheck(index) {
@@ -75,13 +89,12 @@ export default function ExerciseSetCard({
         const row = rows[index]
 
         if (row.isChecked) {
-            const loggedGroup = se.setGroups?.[index]
-            if (!loggedGroup) return
+            if (!row.setGroupId) return
             setCheckingIndex(index)
             try {
-                await onDeleteSet(se.id, loggedGroup.id)
+                await onDeleteSet(se.id, row.setGroupId)
                 setRows(prev => prev.map((r, i) =>
-                    i === index ? { ...r, isChecked: false } : r
+                    i === index ? { ...r, isChecked: false, setGroupId: null } : r
                 ))
             } finally {
                 setCheckingIndex(null)
@@ -91,12 +104,11 @@ export default function ExerciseSetCard({
 
         const weightVal = resolveWeight(row, index)
         const repsVal = resolveReps(row, index)
-
         if (!weightVal || !repsVal) return
 
         setCheckingIndex(index)
         try {
-            await onLogSet(se.id, {
+            const res = await onLogSet(se.id, {
                 setType: 'NORMAL',
                 entries: [{
                     weight: parseFloat(weightVal),
@@ -105,8 +117,14 @@ export default function ExerciseSetCard({
                     reachedFailure: false,
                 }]
             })
+
+            const updatedSe = res?.exercises?.find(e => e.id === se.id)
+            const newGroup = updatedSe?.setGroups?.[updatedSe.setGroups.length - 1]
+
             setRows(prev => prev.map((r, i) =>
-                i === index ? { ...r, isChecked: true } : r
+                i === index
+                    ? { ...r, isChecked: true, setGroupId: newGroup?.id || null }
+                    : r
             ))
             if (!noRest) onRestStart(row.restSeconds || restDuration || 90)
         } finally {
@@ -132,7 +150,7 @@ export default function ExerciseSetCard({
             for (const { r, i } of valid) {
                 const weightVal = resolveWeight(r, i)
                 const repsVal = resolveReps(r, i)
-                await onLogSet(se.id, {
+                const res = await onLogSet(se.id, {
                     setType: 'NORMAL',
                     entries: [{
                         weight: parseFloat(weightVal),
@@ -141,8 +159,12 @@ export default function ExerciseSetCard({
                         reachedFailure: false,
                     }]
                 })
+                const updatedSe = res?.exercises?.find(e => e.id === se.id)
+                const newGroup = updatedSe?.setGroups?.[updatedSe.setGroups.length - 1]
                 setRows(prev => prev.map((row, idx) =>
-                    idx === i ? { ...row, isChecked: true } : row
+                    idx === i
+                        ? { ...row, isChecked: true, setGroupId: newGroup?.id || null }
+                        : row
                 ))
             }
             if (!noRest && valid.length > 0) {
@@ -176,6 +198,7 @@ export default function ExerciseSetCard({
             weightUnit: lastRow?.weightUnit || defaultUnit || 'KG',
             reps: lastRow?.reps || '',
             isChecked: false,
+            setGroupId: null,
             restSeconds: restDuration || 90,
         }])
     }
