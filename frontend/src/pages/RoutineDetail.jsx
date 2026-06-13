@@ -65,7 +65,8 @@ export default function RoutineDetail() {
             exerciseId: exercise.id,
             targetSets: 3,
             targetMinReps: 8,
-            targetMaxReps: 12
+            targetMaxReps: 12,
+            restSeconds: 90
         })
         setShowAddExercise(false)
         setShowTargetForm(true)
@@ -360,6 +361,28 @@ export default function RoutineDetail() {
                                             className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm text-center focus:outline-none focus:border-orange-500"
                                         />
                                     </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-gray-400 text-sm mb-3">
+                                    Default rest timer
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[30, 60, 90, 120, 180, 300].map(s => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() => setTargetForm({ ...targetForm, restSeconds: s })}
+                                            className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                                                targetForm.restSeconds === s
+                                                    ? 'bg-orange-500 text-white'
+                                                    : 'bg-gray-800 text-gray-400'
+                                            }`}
+                                        >
+                                            {s < 60 ? `${s}s` : s === 60 ? '1min' : s === 90 ? '1.5min' : s === 120 ? '2min' : s === 180 ? '3min' : '5min'}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
