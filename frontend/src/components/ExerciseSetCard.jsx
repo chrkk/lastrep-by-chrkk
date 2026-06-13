@@ -14,7 +14,6 @@ export default function ExerciseSetCard({
                                             lastPerf,
                                             onLogSet,
                                             onDeleteSet,
-                                            onCheckAll,
                                             onOpenMenu,
                                             onRestStart,
                                             defaultUnit,
@@ -31,7 +30,6 @@ export default function ExerciseSetCard({
                 weightUnit: lastEntry?.weightUnit || defaultUnit || 'KG',
                 reps: lastEntry ? String(lastEntry.reps) : '',
                 isChecked: false,
-                setGroupId: null,
             })
         }
         return rows
@@ -42,8 +40,14 @@ export default function ExerciseSetCard({
     const [dropRows, setDropRows] = useState([
         { weight: '', weightUnit: defaultUnit || 'KG', reps: '' }
     ])
+    const [checkingIndex, setCheckingIndex] = useState(null)
+    const [checkingAll, setCheckingAll] = useState(false)
 
     const isMulti = setType === 'DROP_SET' ||
+        setType === 'PYRAMID_ASCENDING' ||
+        setType === 'PYRAMID_DESCENDING'
+
+    const noRest = setType === 'DROP_SET' ||
         setType === 'PYRAMID_ASCENDING' ||
         setType === 'PYRAMID_DESCENDING'
 
@@ -55,52 +59,41 @@ export default function ExerciseSetCard({
         setDropRows(prev => prev.map((d, i) => i === index ? { ...d, [field]: value } : d))
     }
 
+    function resolveWeight(row, index) {
+        return row.weight || String(lastPerf?.setGroups?.[index]?.entries?.[0]?.weight || '')
+    }
+
+    function resolveReps(row, index) {
+        return row.reps || String(lastPerf?.setGroups?.[index]?.entries?.[0]?.reps || '')
+    }
+
     async function handleToggleCheck(index) {
+        if (checkingIndex !== null || checkingAll) return
+
         const row = rows[index]
 
         if (row.isChecked) {
-            const group = se.setGroups?.[index]
-            if (group) {
-                await onDeleteSet(se.id, group.id)
+            const loggedGroup = se.setGroups?.[index]
+            if (!loggedGroup) return
+            setCheckingIndex(index)
+            try {
+                await onDeleteSet(se.id, loggedGroup.id)
+                setRows(prev => prev.map((r, i) =>
+                    i === index ? { ...r, isChecked: false } : r
+                ))
+            } finally {
+                setCheckingIndex(null)
             }
-            setRows(prev => prev.map((r, i) =>
-                i === index ? { ...r, isChecked: false, setGroupId: null } : r
-            ))
             return
         }
 
-        const weightVal = row.weight || (lastPerf?.setGroups?.[index]?.entries?.[0]?.weight || '')
-        const repsVal = row.reps || (lastPerf?.setGroups?.[index]?.entries?.[0]?.reps || '')
+        const weightVal = resolveWeight(row, index)
+        const repsVal = resolveReps(row, index)
 
         if (!weightVal || !repsVal) return
 
-        const entries = [{
-            weight: parseFloat(weightVal),
-            weightUnit: row.weightUnit,
-            reps: parseInt(repsVal),
-            reachedFailure: false,
-        }]
-
-        await onLogSet(se.id, { setType, entries })
-
-        setRows(prev => prev.map((r, i) =>
-            i === index ? { ...r, isChecked: true } : r
-        ))
-
-        const noRest = setType === 'DROP_SET' ||
-            setType === 'PYRAMID_ASCENDING' ||
-            setType === 'PYRAMID_DESCENDING'
-
-        if (!noRest) onRestStart()
-    }
-
-    async function handleCheckAll() {
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i]
-            if (row.isChecked) continue
-            const weightVal = row.weight || (lastPerf?.setGroups?.[i]?.entries?.[0]?.weight || '')
-            const repsVal = row.reps || (lastPerf?.setGroups?.[i]?.entries?.[0]?.reps || '')
-            if (!weightVal || !repsVal) continue
+        setCheckingIndex(index)
+        try {
             await onLogSet(se.id, {
                 setType: 'NORMAL',
                 entries: [{
@@ -110,8 +103,50 @@ export default function ExerciseSetCard({
                     reachedFailure: false,
                 }]
             })
+            setRows(prev => prev.map((r, i) =>
+                i === index ? { ...r, isChecked: true } : r
+            ))
+            if (!noRest) onRestStart()
+        } finally {
+            setCheckingIndex(null)
         }
-        setRows(prev => prev.map(r => ({ ...r, isChecked: true })))
+    }
+
+    async function handleCheckAll() {
+        if (checkingIndex !== null || checkingAll) return
+
+        const unchecked = rows
+            .map((r, i) => ({ r, i }))
+            .filter(({ r }) => !r.isChecked)
+
+        const valid = unchecked.filter(({ r, i }) =>
+            resolveWeight(r, i) && resolveReps(r, i)
+        )
+
+        if (valid.length === 0) return
+
+        setCheckingAll(true)
+        try {
+            for (const { r, i } of valid) {
+                const weightVal = resolveWeight(r, i)
+                const repsVal = resolveReps(r, i)
+                await onLogSet(se.id, {
+                    setType: 'NORMAL',
+                    entries: [{
+                        weight: parseFloat(weightVal),
+                        weightUnit: r.weightUnit,
+                        reps: parseInt(repsVal),
+                        reachedFailure: false,
+                    }]
+                })
+                setRows(prev => prev.map((row, idx) =>
+                    idx === i ? { ...row, isChecked: true } : row
+                ))
+            }
+            if (!noRest && valid.length > 0) onRestStart()
+        } finally {
+            setCheckingAll(false)
+        }
     }
 
     async function handleAddSet() {
@@ -127,23 +162,22 @@ export default function ExerciseSetCard({
             if (entries.length === 0) return
             await onLogSet(se.id, { setType, entries })
             setDropRows([{ weight: '', weightUnit: defaultUnit || 'KG', reps: '' }])
-            const noRest = true
-            if (!noRest) onRestStart()
             return
         }
 
         const lastRow = rows[rows.length - 1]
-        const newRow = {
+        setRows(prev => [...prev, {
             weight: lastRow?.weight || '',
             weightUnit: lastRow?.weightUnit || defaultUnit || 'KG',
             reps: lastRow?.reps || '',
             isChecked: false,
-            setGroupId: null,
-        }
-        setRows(prev => [...prev, newRow])
+        }])
     }
 
     const allChecked = rows.length > 0 && rows.every(r => r.isChecked)
+    const hasValidUnchecked = rows.some((r, i) =>
+        !r.isChecked && resolveWeight(r, i) && resolveReps(r, i)
+    )
     const loggedCount = se.setGroups?.length || 0
 
     return (
@@ -166,20 +200,20 @@ export default function ExerciseSetCard({
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                             onClick={handleCheckAll}
-                            disabled={allChecked}
+                            disabled={allChecked || !hasValidUnchecked || checkingAll || checkingIndex !== null}
                             className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                                allChecked
-                                    ? 'text-gray-700 bg-gray-800'
+                                allChecked || !hasValidUnchecked
+                                    ? 'text-gray-700 bg-gray-800 opacity-50'
                                     : 'text-orange-400 bg-orange-500/10 active:bg-orange-500/20'
                             }`}
                         >
-                            ✓ All
+                            {checkingAll ? '...' : '✓ All'}
                         </button>
                         <button
                             onClick={onOpenMenu}
                             className="w-8 h-8 flex items-center justify-center text-gray-500 active:text-white rounded-lg active:bg-gray-800 transition-colors"
                         >
-                            <span className="text-lg leading-none tracking-tighter">⋮</span>
+                            <span className="text-lg leading-none">⋮</span>
                         </button>
                     </div>
                 </div>
@@ -196,12 +230,14 @@ export default function ExerciseSetCard({
                             weightUnit={row.weightUnit}
                             reps={row.reps}
                             isChecked={row.isChecked}
+                            isLoading={checkingIndex === i || checkingAll}
                             onWeightChange={val => updateRow(i, 'weight', val)}
                             onRepsChange={val => updateRow(i, 'reps', val)}
                             onUnitToggle={() => updateRow(i, 'weightUnit',
                                 row.weightUnit === 'KG' ? 'LBS' : 'KG'
                             )}
                             onToggleCheck={() => handleToggleCheck(i)}
+                            onDelete={() => handleToggleCheck(i)}
                         />
                     ))}
                 </div>
