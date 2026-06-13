@@ -19,7 +19,6 @@ export default function StartWorkout() {
     const [lastPerformances, setLastPerformances] = useState({})
     const [menuExercise, setMenuExercise] = useState(null)
     const [exerciseMeta, setExerciseMeta] = useState({})
-
     const timerRef = useRef(null)
 
     useEffect(() => {
@@ -294,11 +293,6 @@ export default function StartWorkout() {
                             onLogSet={handleLogSet}
                             onDeleteSet={handleDeleteSet}
                             onOpenMenu={() => setMenuExercise(se)}
-                            onRestStart={(duration) => {
-                                setRestDuration(duration)
-                                setRestKey(prev => prev + 1)
-                                setRestActive(true)
-                            }}
                         />
                     ))
                 )}
@@ -310,14 +304,6 @@ export default function StartWorkout() {
                     + Add Exercise
                 </button>
             </div>
-
-            {restActive && (
-                <RestTimer
-                    key={restKey}
-                    duration={restDuration}
-                    onDismiss={() => setRestActive(false)}
-                />
-            )}
 
             {showFinishModal && (
                 <div className="fixed inset-0 z-50 flex items-end">
