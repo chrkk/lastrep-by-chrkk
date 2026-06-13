@@ -18,7 +18,9 @@ export default function StartWorkout() {
     const [allExercises, setAllExercises] = useState([])
     const [finishing, setFinishing] = useState(false)
     const [lastPerformances, setLastPerformances] = useState({})
+    const [restKey, setRestKey] = useState(0)
     const [restActive, setRestActive] = useState(false)
+    const [restDuration, setRestDuration] = useState(90)
     const [menuExercise, setMenuExercise] = useState(null)
     const [exerciseMeta, setExerciseMeta] = useState({})
     const timerRef = useRef(null)
@@ -249,11 +251,15 @@ export default function StartWorkout() {
                             se={se}
                             lastPerf={lastPerformances[se.exerciseId]}
                             defaultUnit={exerciseMeta[se.id]?.defaultUnit || 'KG'}
+                            restDuration={exerciseMeta[se.id]?.restDuration || 90}
                             onLogSet={handleLogSet}
                             onDeleteSet={handleDeleteSet}
-                            onCheckAll={() => {}}
                             onOpenMenu={() => setMenuExercise(se)}
-                            onRestStart={() => setRestActive(true)}
+                            onRestStart={(duration) => {
+                                setRestDuration(duration)
+                                setRestKey(prev => prev + 1)
+                                setRestActive(true)
+                            }}
                         />
                     ))
                 )}
@@ -268,11 +274,8 @@ export default function StartWorkout() {
 
             {restActive && (
                 <RestTimer
-                    duration={
-                        menuExercise
-                            ? exerciseMeta[menuExercise.id]?.restDuration || 90
-                            : 90
-                    }
+                    key={restKey}
+                    duration={restDuration}
                     onDismiss={() => setRestActive(false)}
                 />
             )}

@@ -17,6 +17,7 @@ export default function ExerciseSetCard({
                                             onOpenMenu,
                                             onRestStart,
                                             defaultUnit,
+                                            restDuration,
                                         }) {
     const targetSets = se.targetSets || 3
 
@@ -106,7 +107,7 @@ export default function ExerciseSetCard({
             setRows(prev => prev.map((r, i) =>
                 i === index ? { ...r, isChecked: true } : r
             ))
-            if (!noRest) onRestStart()
+            if (!noRest) onRestStart(restDuration || 90)
         } finally {
             setCheckingIndex(null)
         }
