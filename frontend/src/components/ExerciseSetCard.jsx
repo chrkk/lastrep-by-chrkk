@@ -44,6 +44,13 @@ export default function ExerciseSetCard({
     const [checkingIndex, setCheckingIndex] = useState(null)
     const [checkingAll, setCheckingAll] = useState(false)
     const [activeTimerIndex, setActiveTimerIndex] = useState(null)
+    const [loggedMultiGroups, setLoggedMultiGroups] = useState(
+        se.setGroups?.filter(g =>
+            g.setType === 'DROP_SET' ||
+            g.setType === 'PYRAMID_ASCENDING' ||
+            g.setType === 'PYRAMID_DESCENDING'
+        ) || []
+    )
 
     useEffect(() => {
         setRows(prev => prev.map(r =>
@@ -51,6 +58,20 @@ export default function ExerciseSetCard({
         ))
         setDropRows(prev => prev.map(d => ({ ...d, weightUnit: defaultUnit || 'KG' })))
     }, [defaultUnit])
+
+    useEffect(() => {
+        setLoggedMultiGroups(
+            se.setGroups?.filter(g =>
+                g.setType === 'DROP_SET' ||
+                g.setType === 'PYRAMID_ASCENDING' ||
+                g.setType === 'PYRAMID_DESCENDING'
+            ) || []
+        )
+    }, [se.setGroups])
+
+    const isMulti = setType === 'DROP_SET' ||
+        setType === 'PYRAMID_ASCENDING' ||
+        setType === 'PYRAMID_DESCENDING'
 
     const noRest = setType === 'DROP_SET'
 
@@ -121,9 +142,7 @@ export default function ExerciseSetCard({
                     : r
             ))
 
-            if (!noRest) {
-                setActiveTimerIndex(index)
-            }
+            if (!noRest) setActiveTimerIndex(index)
         } finally {
             setCheckingIndex(null)
         }
@@ -184,7 +203,17 @@ export default function ExerciseSetCard({
                     reachedFailure: false,
                 }))
             if (entries.length === 0) return
-            await onLogSet(se.id, { setType, entries })
+            const res = await onLogSet(se.id, { setType, entries })
+            const updatedSe = res?.exercises?.find(e => e.id === se.id)
+            if (updatedSe) {
+                setLoggedMultiGroups(
+                    updatedSe.setGroups?.filter(g =>
+                        g.setType === 'DROP_SET' ||
+                        g.setType === 'PYRAMID_ASCENDING' ||
+                        g.setType === 'PYRAMID_DESCENDING'
+                    ) || []
+                )
+            }
             setDropRows([{ weight: '', weightUnit: defaultUnit || 'KG', reps: '' }])
             return
         }
@@ -199,10 +228,6 @@ export default function ExerciseSetCard({
             restSeconds: restDuration || 90,
         }])
     }
-
-    const isMulti = setType === 'DROP_SET' ||
-        setType === 'PYRAMID_ASCENDING' ||
-        setType === 'PYRAMID_DESCENDING'
 
     const allChecked = rows.length > 0 && rows.every(r => r.isChecked)
     const hasValidUnchecked = rows.some((r, i) =>
@@ -249,7 +274,7 @@ export default function ExerciseSetCard({
                 </div>
             </div>
 
-            {!isMulti ? (
+            {!isMulti && (
                 <div className="divide-y divide-gray-800/50">
                     {rows.map((row, i) => (
                         <SetRow
@@ -276,57 +301,105 @@ export default function ExerciseSetCard({
                         />
                     ))}
                 </div>
-            ) : (
-                <div className="px-4 pt-3 pb-2 space-y-2">
-                    {dropRows.map((drop, di) => (
-                        <div key={di} className="flex items-center gap-2">
-              <span className="text-gray-600 text-xs w-4 text-center flex-shrink-0">
-                {di + 1}
-              </span>
-                            <input
-                                type="text"
-                                inputMode="decimal"
-                                value={drop.weight}
-                                onChange={e => updateDrop(di, 'weight', e.target.value)}
-                                placeholder="Weight"
-                                className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
-                            />
-                            <button
-                                onClick={() => updateDrop(di, 'weightUnit',
-                                    drop.weightUnit === 'KG' ? 'LBS' : 'KG'
-                                )}
-                                className="bg-gray-800 border border-gray-700 text-gray-400 text-xs px-2 py-2.5 rounded-xl flex-shrink-0 w-10"
-                            >
-                                {drop.weightUnit === 'KG' ? 'kg' : 'lbs'}
-                            </button>
-                            <span className="text-gray-700 text-xs flex-shrink-0">×</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={drop.reps}
-                                onChange={e => updateDrop(di, 'reps', e.target.value)}
-                                placeholder="Reps"
-                                className="w-14 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 flex-shrink-0"
-                            />
-                            {dropRows.length > 1 && (
+            )}
+
+            {isMulti && (
+                <div className="px-4 pt-3 pb-2">
+                    {loggedMultiGroups.filter(g => g.setType === setType).map((group) => (
+                        <div key={group.id} className="mb-3 bg-gray-800/60 rounded-xl px-3 py-2.5">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-gray-400 text-xs font-medium">
+                                    Set {group.setNumber} —{' '}
+                                    {setType === 'DROP_SET' ? 'Drop Set' :
+                                        setType === 'PYRAMID_ASCENDING' ? 'Pyramid ↑' : 'Pyramid ↓'}
+                                </p>
                                 <button
-                                    onClick={() => setDropRows(prev => prev.filter((_, i) => i !== di))}
-                                    className="text-gray-700 active:text-red-400 text-sm flex-shrink-0 w-4"
+                                    onClick={async () => {
+                                        await onDeleteSet(se.id, group.id)
+                                        setLoggedMultiGroups(prev => prev.filter(g => g.id !== group.id))
+                                    }}
+                                    className="text-gray-600 active:text-red-400 text-xs transition-colors"
                                 >
-                                    ✕
+                                    ✕ Remove
                                 </button>
-                            )}
+                            </div>
+                            {group.entries.map((entry, ei) => (
+                                <p key={ei} className="text-gray-300 text-xs py-0.5">
+                                    {setType === 'DROP_SET' ? `Drop ${ei + 1}` : `Step ${ei + 1}`}:{' '}
+                                    {entry.weight}{entry.weightUnit === 'KG' ? 'kg' : 'lbs'} × {entry.reps} reps
+                                </p>
+                            ))}
                         </div>
                     ))}
-                    <button
-                        onClick={() => setDropRows(prev => [
-                            ...prev,
-                            { weight: '', weightUnit: defaultUnit || 'KG', reps: '' }
-                        ])}
-                        className="w-full border border-dashed border-gray-700 text-gray-500 text-xs py-2 rounded-xl active:border-gray-500 transition-colors"
-                    >
-                        + Add {setType === 'DROP_SET' ? 'Drop' : 'Step'}
-                    </button>
+
+                    <p className="text-gray-600 text-xs mb-2 mt-1">
+                        {setType === 'DROP_SET'
+                            ? 'Add drops — no rest between them'
+                            : setType === 'PYRAMID_ASCENDING'
+                                ? 'Light to heavy — add each step'
+                                : 'Heavy to light — add each step'}
+                    </p>
+
+                    <div className="space-y-2">
+                        {dropRows.map((drop, di) => (
+                            <div key={di} className="flex items-center gap-2">
+                <span className="text-gray-600 text-xs w-4 text-center flex-shrink-0">
+                  {di + 1}
+                </span>
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={drop.weight}
+                                    onChange={e => updateDrop(di, 'weight', e.target.value)}
+                                    placeholder="Weight"
+                                    className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
+                                />
+                                <button
+                                    onClick={() => updateDrop(di, 'weightUnit',
+                                        drop.weightUnit === 'KG' ? 'LBS' : 'KG'
+                                    )}
+                                    className="bg-gray-800 border border-gray-700 text-gray-400 text-xs px-2 py-2.5 rounded-xl flex-shrink-0 w-10"
+                                >
+                                    {drop.weightUnit === 'KG' ? 'kg' : 'lbs'}
+                                </button>
+                                <span className="text-gray-700 text-xs flex-shrink-0">×</span>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={drop.reps}
+                                    onChange={e => updateDrop(di, 'reps', e.target.value)}
+                                    placeholder="Reps"
+                                    className="w-14 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 flex-shrink-0"
+                                />
+                                {dropRows.length > 1 && (
+                                    <button
+                                        onClick={() => setDropRows(prev => prev.filter((_, i) => i !== di))}
+                                        className="text-gray-700 active:text-red-400 text-sm flex-shrink-0 w-4"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+
+                        <button
+                            onClick={() => setDropRows(prev => [
+                                ...prev,
+                                { weight: '', weightUnit: defaultUnit || 'KG', reps: '' }
+                            ])}
+                            className="w-full border border-dashed border-gray-700 text-gray-500 text-xs py-2 rounded-xl active:border-gray-500 transition-colors"
+                        >
+                            + Add {setType === 'DROP_SET' ? 'Drop' : 'Step'}
+                        </button>
+
+                        <button
+                            onClick={handleAddSet}
+                            className="w-full bg-orange-500 active:bg-orange-600 text-white text-xs font-semibold py-3 rounded-xl transition-colors mt-1"
+                        >
+                            Log {setType === 'DROP_SET' ? 'Drop Set' :
+                            setType === 'PYRAMID_ASCENDING' ? 'Pyramid ↑' : 'Pyramid ↓'} ✓
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -346,12 +419,14 @@ export default function ExerciseSetCard({
                         </button>
                     ))}
                 </div>
-                <button
-                    onClick={handleAddSet}
-                    className="w-full border border-dashed border-gray-700 active:border-orange-500/50 text-gray-500 active:text-orange-400 text-xs py-2.5 rounded-xl transition-colors"
-                >
-                    + Add Set
-                </button>
+                {!isMulti && (
+                    <button
+                        onClick={handleAddSet}
+                        className="w-full border border-dashed border-gray-700 active:border-orange-500/50 text-gray-500 active:text-orange-400 text-xs py-2.5 rounded-xl transition-colors"
+                    >
+                        + Add Set
+                    </button>
+                )}
             </div>
         </div>
     )
