@@ -25,6 +25,7 @@ export default function ExerciseSetCard({
             const lastGroup = lastPerf?.setGroups?.[i]
             const lastEntry = lastGroup?.entries?.[0]
             rows.push({
+                uid: `init-${i}-${Date.now()}`,
                 weight: lastEntry ? String(lastEntry.weight) : '',
                 weightUnit: lastEntry?.weightUnit || defaultUnit || 'KG',
                 reps: lastEntry ? String(lastEntry.reps) : '',
@@ -247,6 +248,7 @@ export default function ExerciseSetCard({
 
         const lastRow = rows[rows.length - 1]
         setRows(prev => [...prev, {
+            uid: `added-${Date.now()}`,
             weight: lastRow?.weight || '',
             weightUnit: lastRow?.weightUnit || defaultUnit || 'KG',
             reps: lastRow?.reps || '',
@@ -302,7 +304,7 @@ export default function ExerciseSetCard({
                     <div className="divide-y divide-gray-800/50">
                         {rows.map((row, i) => (
                             <SetRow
-                                key={i}
+                                key={row.uid}
                                 setNumber={i + 1}
                                 lastEntry={lastPerf?.setGroups?.[i]?.entries?.[0]}
                                 weight={row.weight}
