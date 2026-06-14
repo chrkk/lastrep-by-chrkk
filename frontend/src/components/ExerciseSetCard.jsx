@@ -233,7 +233,6 @@ export default function ExerciseSetCard({
     const hasValidUnchecked = rows.some((r, i) =>
         !r.isChecked && resolveWeight(r, i) && resolveReps(r, i)
     )
-    const loggedCount = se.setGroups?.length || 0
 
     return (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
@@ -243,14 +242,9 @@ export default function ExerciseSetCard({
                         <p className="text-white font-semibold text-sm truncate">
                             {se.exerciseName}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            {se.muscleGroup && (
-                                <span className="text-orange-400 text-xs">{se.muscleGroup}</span>
-                            )}
-                            <span className="text-gray-600 text-xs">
-                {loggedCount}/{rows.length} sets
-              </span>
-                        </div>
+                        {se.muscleGroup && (
+                            <span className="text-orange-400 text-xs">{se.muscleGroup}</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <button
@@ -295,7 +289,6 @@ export default function ExerciseSetCard({
                                 row.weightUnit === 'KG' ? 'LBS' : 'KG'
                             )}
                             onToggleCheck={() => handleToggleCheck(i)}
-                            onDelete={() => handleToggleCheck(i)}
                             onRestChange={val => updateRow(i, 'restSeconds', val)}
                             onTimerDone={() => setActiveTimerIndex(null)}
                         />
@@ -343,9 +336,9 @@ export default function ExerciseSetCard({
                     <div className="space-y-2">
                         {dropRows.map((drop, di) => (
                             <div key={di} className="flex items-center gap-2">
-                <span className="text-gray-600 text-xs w-4 text-center flex-shrink-0">
-                  {di + 1}
-                </span>
+                                <span className="text-gray-600 text-xs w-4 text-center flex-shrink-0">
+                                    {di + 1}
+                                </span>
                                 <input
                                     type="text"
                                     inputMode="decimal"
