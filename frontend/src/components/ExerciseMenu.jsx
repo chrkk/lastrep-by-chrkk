@@ -23,6 +23,8 @@ export default function ExerciseMenu({
     const [activeTab, setActiveTab] = useState(null)
     const [noteInput, setNoteInput] = useState(note || '')
 
+    const safeBottom = { paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }
+
     function handleNoteSave() {
         onNoteChange(noteInput)
         setActiveTab(null)
@@ -41,7 +43,7 @@ export default function ExerciseMenu({
                 </div>
 
                 {activeTab === null && (
-                    <div className="px-4 pb-10 space-y-1">
+                    <div className="px-4 space-y-1" style={safeBottom}>
                         <button
                             onClick={() => setActiveTab('note')}
                             className="w-full flex items-center gap-4 px-4 py-4 active:bg-gray-800 rounded-2xl transition-colors text-left"
@@ -99,7 +101,7 @@ export default function ExerciseMenu({
                 )}
 
                 {activeTab === 'note' && (
-                    <div className="px-5 pb-10">
+                    <div className="px-5" style={safeBottom}>
                         <button
                             onClick={() => setActiveTab(null)}
                             className="text-gray-500 text-sm mb-4 flex items-center gap-1"
@@ -126,7 +128,7 @@ export default function ExerciseMenu({
                 )}
 
                 {activeTab === 'rest' && (
-                    <div className="px-5 pb-10">
+                    <div className="px-5" style={safeBottom}>
                         <button
                             onClick={() => setActiveTab(null)}
                             className="text-gray-500 text-sm mb-4 flex items-center gap-1"
@@ -153,7 +155,7 @@ export default function ExerciseMenu({
                 )}
 
                 {activeTab === 'unit' && (
-                    <div className="px-5 pb-10">
+                    <div className="px-5" style={safeBottom}>
                         <button
                             onClick={() => setActiveTab(null)}
                             className="text-gray-500 text-sm mb-4 flex items-center gap-1"

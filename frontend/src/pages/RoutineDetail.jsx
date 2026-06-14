@@ -286,7 +286,7 @@ export default function RoutineDetail() {
                         className="absolute inset-0 bg-black/70"
                         onClick={() => setShowTargetForm(false)}
                     />
-                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 pb-10 z-10">
+                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
 
                         <h2 className="text-white font-semibold text-lg mb-1">
