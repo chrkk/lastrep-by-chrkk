@@ -118,7 +118,12 @@ export default function ExerciseSetCard({
                 await onDeleteSet(se.id, row.setGroupId)
             }
             setRows(prev => prev.filter((_, i) => i !== deleteTarget))
-            if (activeTimerIndex === deleteTarget) setActiveTimerIndex(null)
+            setActiveTimerIndex(prev => {
+                if (prev === null) return null
+                if (prev === deleteTarget) return null
+                if (prev > deleteTarget) return prev - 1
+                return prev
+            })
         } finally {
             setDeleting(false)
             setDeleteTarget(null)
