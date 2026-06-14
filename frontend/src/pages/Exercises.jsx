@@ -192,7 +192,6 @@ export default function Exercises() {
                         onClick={closeForm}
                     />
 
-                    {/* Sheet */}
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
 
                         {/* Handle bar */}
