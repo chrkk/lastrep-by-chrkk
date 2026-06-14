@@ -32,9 +32,13 @@ export default function SetRow({
                                    onToggleCheck,
                                    onRestChange,
                                    onTimerDone,
+                                   onLongPress,
                                }) {
     const [remaining, setRemaining] = useState(restSeconds)
+    const [isPressing, setIsPressing] = useState(false)
     const intervalRef = useRef(null)
+    const longPressRef = useRef(null)
+    const pressStartRef = useRef(false)
 
     useEffect(() => {
         setRemaining(restSeconds)
@@ -60,13 +64,39 @@ export default function SetRow({
         return () => clearInterval(intervalRef.current)
     }, [isTimerActive, isChecked])
 
+    function handlePressStart() {
+        if (isLoading) return
+        pressStartRef.current = true
+        setIsPressing(true)
+        longPressRef.current = setTimeout(() => {
+            if (pressStartRef.current) {
+                setIsPressing(false)
+                onLongPress?.()
+            }
+        }, 500)
+    }
+
+    function handlePressEnd() {
+        pressStartRef.current = false
+        setIsPressing(false)
+        clearTimeout(longPressRef.current)
+    }
+
     const progress = restSeconds > 0 ? remaining / restSeconds : 0
 
     return (
         <div>
-            <div className={`px-4 py-3 flex items-center gap-3 transition-opacity ${
-                isChecked ? 'opacity-70' : ''
-            }`}>
+            <div
+                className={`px-4 py-3 flex items-center gap-3 transition-all select-none ${
+                    isChecked ? 'opacity-70' : ''
+                } ${isPressing ? 'bg-orange-500/10' : ''}`}
+                onTouchStart={handlePressStart}
+                onTouchEnd={handlePressEnd}
+                onTouchCancel={handlePressEnd}
+                onMouseDown={handlePressStart}
+                onMouseUp={handlePressEnd}
+                onMouseLeave={handlePressEnd}
+            >
                 <div className="w-8 flex-shrink-0 text-center">
                     <p className="text-gray-500 text-xs font-medium">{setNumber}</p>
                     {lastEntry && (
@@ -85,11 +115,15 @@ export default function SetRow({
                         onChange={e => onWeightChange(e.target.value)}
                         placeholder={lastEntry ? String(lastEntry.weight) : '0'}
                         disabled={isChecked || isLoading}
+                        onTouchStart={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
                         className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 disabled:opacity-50 min-w-0"
                     />
                     <button
                         onClick={onUnitToggle}
                         disabled={isChecked || isLoading}
+                        onTouchStart={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
                         className="bg-gray-800 border border-gray-700 text-gray-400 text-xs px-2 py-2.5 rounded-xl flex-shrink-0 disabled:opacity-50 w-10"
                     >
                         {weightUnit === 'KG' ? 'kg' : 'lbs'}
@@ -105,6 +139,8 @@ export default function SetRow({
                     onChange={e => onRepsChange(e.target.value)}
                     placeholder={lastEntry ? String(lastEntry.reps) : '0'}
                     disabled={isChecked || isLoading}
+                    onTouchStart={e => e.stopPropagation()}
+                    onMouseDown={e => e.stopPropagation()}
                     className="w-14 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 disabled:opacity-50 flex-shrink-0"
                 />
 
@@ -112,6 +148,8 @@ export default function SetRow({
                     <button
                         onClick={onToggleCheck}
                         disabled={isLoading}
+                        onTouchStart={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
                         className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
                             isLoading
                                 ? 'border-gray-700 opacity-50'
