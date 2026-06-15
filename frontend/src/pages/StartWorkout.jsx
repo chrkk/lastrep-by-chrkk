@@ -342,9 +342,15 @@ export default function StartWorkout() {
                                     </button>
                                     <button
                                         onClick={() => setShowFinishModal(false)}
-                                        className="w-full text-gray-600 text-sm py-3"
+                                        className="w-full text-gray-500 text-sm py-3"
                                     >
                                         Keep going
+                                    </button>
+                                    <button
+                                        onClick={handleDiscard}
+                                        className="w-full text-red-400/70 text-sm py-2"
+                                    >
+                                        Discard workout
                                     </button>
                                 </div>
                             </>
