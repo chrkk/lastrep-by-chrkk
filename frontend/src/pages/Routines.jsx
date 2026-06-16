@@ -12,6 +12,8 @@ export default function Routines() {
     const [form, setForm] = useState({ name: '', description: '' })
     const [error, setError] = useState('')
     const [saving, setSaving] = useState(false)
+    const [deleteTarget, setDeleteTarget] = useState(null)
+    const [deleting, setDeleting] = useState(false)
 
     useEffect(() => {
         fetchRoutines()
@@ -82,14 +84,21 @@ export default function Routines() {
         }
     }
 
-    async function handleDelete(id, e) {
-        e.stopPropagation()
-        if (!confirm('Delete this routine?')) return
+    function confirmDelete(routine) {
+        setDeleteTarget(routine)
+    }
+
+    async function handleDelete() {
+        if (!deleteTarget) return
+        setDeleting(true)
         try {
-            await api.delete(`/api/routines/${id}`)
-            setRoutines(routines.filter(r => r.id !== id))
+            await api.delete(`/api/routines/${deleteTarget.id}`)
+            setRoutines(prev => prev.filter(r => r.id !== deleteTarget.id))
         } catch (err) {
             console.error('Failed to delete routine', err)
+        } finally {
+            setDeleting(false)
+            setDeleteTarget(null)
         }
     }
 
@@ -250,6 +259,47 @@ export default function Routines() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/70"
+                        onClick={() => setDeleteTarget(null)}
+                    />
+                    <div
+                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
+                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+                    >
+                        <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
+                        <div className="text-center mb-6">
+                            <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h2 className="text-white font-bold text-lg">Delete routine?</h2>
+                            <p className="text-gray-500 text-sm mt-1">
+                                "{deleteTarget.name}" will be permanently removed
+                            </p>
+                        </div>
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="w-full bg-red-500/10 active:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold py-4 rounded-2xl transition-colors disabled:opacity-50"
+                            >
+                                {deleting ? 'Deleting...' : 'Delete Routine'}
+                            </button>
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                className="w-full bg-gray-800 active:bg-gray-700 text-gray-400 font-medium py-4 rounded-2xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
