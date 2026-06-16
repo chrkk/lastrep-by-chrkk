@@ -122,7 +122,7 @@ export default function RoutineDetail() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 pb-8">
+        <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
 
             <div className="px-4 py-6">
