@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { playRestCompleteSound } from '../utils/sound'
 
 const REST_OPTIONS = [
     { label: '30s', value: 30 },
@@ -51,6 +52,7 @@ export default function SetRow({
                 setRemaining(prev => {
                     if (prev <= 1) {
                         clearInterval(intervalRef.current)
+                        playRestCompleteSound()
                         onTimerDone?.()
                         return 0
                     }
