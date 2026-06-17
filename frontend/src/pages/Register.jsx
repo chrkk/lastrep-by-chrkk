@@ -15,6 +15,12 @@ export default function Register() {
     async function handleSubmit(e) {
         e.preventDefault()
         setError('')
+
+        if (form.password.length < 6) {
+            setError('Password must be at least 6 characters.')
+            return
+        }
+
         setLoading(true)
         try {
             const res = await api.post('/api/auth/register', form)
@@ -57,7 +63,7 @@ export default function Register() {
                                 name="name"
                                 value={form.name}
                                 onChange={handleChange}
-                                placeholder="Christian Jake"
+                                placeholder="Enter Full Name"
                                 required
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
@@ -70,7 +76,7 @@ export default function Register() {
                                 name="username"
                                 value={form.username}
                                 onChange={handleChange}
-                                placeholder="chrkk"
+                                placeholder="Enter Username"
                                 required
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
@@ -85,6 +91,7 @@ export default function Register() {
                                 onChange={handleChange}
                                 placeholder="Min. 6 characters"
                                 required
+                                minLength={6}
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
