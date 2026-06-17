@@ -59,6 +59,9 @@ export default function Dashboard() {
         }
     }
 
+    const isNewUser = !loading && dashboard && !dashboard.hasExercises && !dashboard.hasRoutines
+    const needsRoutine = !loading && dashboard && dashboard.hasExercises && !dashboard.hasRoutines
+
     return (
         <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
@@ -69,37 +72,103 @@ export default function Dashboard() {
                         Hey, {name} 👋
                     </h1>
                     <p className="text-gray-500 text-sm mt-1">
-                        {loading ? 'Loading...' : dashboard?.lastWorkoutDate
-                            ? `Last workout ${formatDate(dashboard.lastWorkoutDate)}`
-                            : 'No workouts yet — start your first one'}
+                        {loading ? 'Loading...' : isNewUser
+                            ? "Let's set up your first workout"
+                            : dashboard?.lastWorkoutDate
+                                ? `Last workout ${formatDate(dashboard.lastWorkoutDate)}`
+                                : 'No workouts yet — start your first one'}
                     </p>
                 </div>
 
-                {dashboard?.suggestedRoutineId ? (
-                    <button
-                        onClick={handleStartSuggested}
-                        disabled={starting}
-                        className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-bold py-5 rounded-2xl mb-2 transition-colors"
-                    >
-                        {starting ? 'Starting...' : `💪 Start ${dashboard.suggestedRoutineName}`}
-                    </button>
+                {isNewUser ? (
+                    <div className="bg-gray-900 border border-orange-500/20 rounded-2xl p-5 mb-6">
+                        <p className="text-3xl mb-3">👋</p>
+                        <h2 className="text-white font-bold text-lg mb-1">
+                            Welcome to LastRep
+                        </h2>
+                        <p className="text-gray-500 text-sm mb-5">
+                            Two quick steps and you're ready to train.
+                        </p>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => navigate('/exercises')}
+                                className="w-full flex items-center gap-4 bg-gray-800 active:bg-gray-700 rounded-2xl px-4 py-4 text-left transition-colors"
+                            >
+                                <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-orange-400 font-bold text-sm">1</span>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-white text-sm font-medium">Add an exercise</p>
+                                    <p className="text-gray-500 text-xs mt-0.5">
+                                        Build your exercise library
+                                    </p>
+                                </div>
+                                <span className="text-gray-600 text-lg">›</span>
+                            </button>
+
+                            <button
+                                onClick={() => navigate('/routines')}
+                                className="w-full flex items-center gap-4 bg-gray-800 active:bg-gray-700 rounded-2xl px-4 py-4 text-left transition-colors"
+                            >
+                                <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-orange-400 font-bold text-sm">2</span>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-white text-sm font-medium">Create a routine</p>
+                                    <p className="text-gray-500 text-xs mt-0.5">
+                                        Group exercises into a workout plan
+                                    </p>
+                                </div>
+                                <span className="text-gray-600 text-lg">›</span>
+                            </button>
+                        </div>
+                    </div>
+                ) : needsRoutine ? (
+                    <div className="bg-gray-900 border border-orange-500/20 rounded-2xl p-5 mb-6">
+                        <p className="text-3xl mb-3">📋</p>
+                        <h2 className="text-white font-bold text-lg mb-1">
+                            One more step
+                        </h2>
+                        <p className="text-gray-500 text-sm mb-4">
+                            You've got exercises ready. Now create a routine to group them into a workout.
+                        </p>
+                        <button
+                            onClick={() => navigate('/routines')}
+                            className="w-full bg-orange-500 active:bg-orange-600 text-white font-semibold py-4 rounded-2xl transition-colors"
+                        >
+                            Create your first routine
+                        </button>
+                    </div>
                 ) : (
-                    <button
-                        onClick={() => navigate('/select-routine')}
-                        className="w-full bg-orange-500 active:bg-orange-600 text-white font-bold py-5 rounded-2xl mb-2 transition-colors"
-                    >
-                        💪 Start Workout
-                    </button>
+                    <>
+                        {dashboard?.suggestedRoutineId ? (
+                            <button
+                                onClick={handleStartSuggested}
+                                disabled={starting}
+                                className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-bold py-5 rounded-2xl mb-2 transition-colors"
+                            >
+                                {starting ? 'Starting...' : `💪 Start ${dashboard.suggestedRoutineName}`}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => navigate('/select-routine')}
+                                className="w-full bg-orange-500 active:bg-orange-600 text-white font-bold py-5 rounded-2xl mb-2 transition-colors"
+                            >
+                                💪 Start Workout
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => navigate('/select-routine')}
+                            className="w-full bg-gray-900 border border-gray-800 active:bg-gray-800 text-gray-400 text-sm py-3 rounded-2xl mb-6 transition-colors"
+                        >
+                            Choose a different routine
+                        </button>
+                    </>
                 )}
 
-                <button
-                    onClick={() => navigate('/select-routine')}
-                    className="w-full bg-gray-900 border border-gray-800 active:bg-gray-800 text-gray-400 text-sm py-3 rounded-2xl mb-6 transition-colors"
-                >
-                    Choose a different routine
-                </button>
-
-                {!loading && dashboard && (
+                {!loading && dashboard && !isNewUser && !needsRoutine && (
                     <div className="grid grid-cols-2 gap-3 mb-6">
                         <div className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4">
                             <p className="text-gray-500 text-xs mb-1">This week</p>
