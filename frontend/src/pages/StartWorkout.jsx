@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import ExerciseSetCard from '../components/ExerciseSetCard'
 import ExerciseMenu from '../components/ExerciseMenu'
+import Toast from '../components/Toast'
 
 export default function StartWorkout() {
     const { sessionId } = useParams()
@@ -19,6 +20,7 @@ export default function StartWorkout() {
     const [lastPerformances, setLastPerformances] = useState({})
     const [menuExercise, setMenuExercise] = useState(null)
     const [exerciseMeta, setExerciseMeta] = useState({})
+    const [toast, setToast] = useState(null)
     const timerRef = useRef(null)
 
     useEffect(() => {
@@ -122,6 +124,10 @@ export default function StartWorkout() {
             return res.data
         } catch (err) {
             console.error('Failed to log set', err)
+            setToast({
+                message: 'Failed to save set. Check your connection and try again.',
+                type: 'error'
+            })
         }
     }
 
@@ -131,8 +137,13 @@ export default function StartWorkout() {
                 `/api/workout-sessions/${sessionId}/exercises/${seId}/sets/${setGroupId}`
             )
             setSession(res.data)
+            return res.data
         } catch (err) {
             console.error('Failed to delete set', err)
+            setToast({
+                message: 'Failed to remove set. Check your connection and try again.',
+                type: 'error'
+            })
         }
     }
 
@@ -158,7 +169,13 @@ export default function StartWorkout() {
                             [exerciseId]: perfRes.data
                         }))
                     }
-                } catch (_) {}
+                } catch (err) {
+                    console.error('Failed to add exercise', err)
+                    setToast({
+                        message: 'Failed to add exercise. Try again.',
+                        type: 'error'
+                    })
+                }
             }
             setSession(res.data)
             setShowAddExercise(false)
@@ -175,6 +192,10 @@ export default function StartWorkout() {
             navigate('/history')
         } catch (err) {
             console.error(err)
+            setToast({
+                message: 'Failed to save workout. Try again.',
+                type: 'error'
+            })
         } finally {
             setFinishing(false)
         }
@@ -209,6 +230,10 @@ export default function StartWorkout() {
             navigate('/history')
         } catch (err) {
             console.error('Auto-finish failed', err)
+            setToast({
+                message: 'Failed to auto-fill and finish. Try again.',
+                type: 'error'
+            })
         } finally {
             setFinishing(false)
         }
