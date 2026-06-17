@@ -12,6 +12,8 @@ public class DashboardResponse {
     private Long lastWorkoutDuration;
     private Integer weeklySessionCount;
     private List<RecentSessionResponse> recentSessions;
+    private boolean hasExercises;
+    private boolean hasRoutines;
 
     public String getSuggestedRoutineName() { return suggestedRoutineName; }
     public void setSuggestedRoutineName(String suggestedRoutineName) { this.suggestedRoutineName = suggestedRoutineName; }
@@ -33,4 +35,10 @@ public class DashboardResponse {
 
     public List<RecentSessionResponse> getRecentSessions() { return recentSessions; }
     public void setRecentSessions(List<RecentSessionResponse> recentSessions) { this.recentSessions = recentSessions; }
+
+    public boolean isHasExercises() { return hasExercises; }
+    public void setHasExercises(boolean hasExercises) { this.hasExercises = hasExercises; }
+
+    public boolean isHasRoutines() { return hasRoutines; }
+    public void setHasRoutines(boolean hasRoutines) { this.hasRoutines = hasRoutines; }
 }
