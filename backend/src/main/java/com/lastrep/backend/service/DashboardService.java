@@ -16,19 +16,28 @@ public class DashboardService {
 
     private final WorkoutSessionRepository sessionRepository;
     private final RoutineRepository routineRepository;
+    private final ExerciseRepository exerciseRepository;
     private final UserService userService;
 
     public DashboardService(WorkoutSessionRepository sessionRepository,
                             RoutineRepository routineRepository,
+                            ExerciseRepository exerciseRepository,
                             UserService userService) {
         this.sessionRepository = sessionRepository;
         this.routineRepository = routineRepository;
+        this.exerciseRepository = exerciseRepository;
         this.userService = userService;
     }
 
     public DashboardResponse getDashboard() {
         User user = userService.getCurrentUser();
         DashboardResponse response = new DashboardResponse();
+
+        List<Routine> userRoutines = routineRepository.findByUserIdOrderByRoutineOrderAsc(user.getId());
+        long exerciseCount = exerciseRepository.countByUserId(user.getId());
+
+        response.setHasExercises(exerciseCount > 0);
+        response.setHasRoutines(!userRoutines.isEmpty());
 
         List<WorkoutSession> completed = sessionRepository
                 .findByUserIdAndStatusOrderByCreatedAtDesc(
@@ -43,9 +52,9 @@ public class DashboardService {
                 response.setLastWorkoutDuration(
                         Duration.between(last.getCreatedAt(), last.getFinishedAt()).getSeconds());
             }
-            setSuggestedRoutine(user.getId(), last, response);
+            setSuggestedRoutine(userRoutines, last, response);
         } else {
-            setFirstRoutineAsSuggested(user.getId(), response);
+            setFirstRoutineAsSuggested(userRoutines, response);
         }
 
         LocalDateTime weekStart = LocalDateTime.now().minusDays(7);
@@ -63,10 +72,8 @@ public class DashboardService {
         return response;
     }
 
-    private void setSuggestedRoutine(Long userId, WorkoutSession lastSession,
+    private void setSuggestedRoutine(List<Routine> routines, WorkoutSession lastSession,
                                      DashboardResponse response) {
-        List<Routine> routines = routineRepository
-                .findByUserIdOrderByRoutineOrderAsc(userId);
         if (routines.isEmpty()) return;
 
         if (lastSession.getRoutine() == null) {
@@ -89,9 +96,7 @@ public class DashboardService {
         response.setSuggestedRoutineName(routines.get(0).getName());
     }
 
-    private void setFirstRoutineAsSuggested(Long userId, DashboardResponse response) {
-        List<Routine> routines = routineRepository
-                .findByUserIdOrderByRoutineOrderAsc(userId);
+    private void setFirstRoutineAsSuggested(List<Routine> routines, DashboardResponse response) {
         if (routines.isEmpty()) return;
         response.setSuggestedRoutineId(routines.get(0).getId());
         response.setSuggestedRoutineName(routines.get(0).getName());
