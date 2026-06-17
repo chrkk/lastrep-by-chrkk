@@ -4,7 +4,7 @@ import api from '../api/axios'
 
 export default function Register() {
     const navigate = useNavigate()
-    const [form, setForm] = useState({ name: '', username: '', password: '' })
+    const [form, setForm] = useState({ name: '', username: '', password: '', confirmPassword: '' })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -21,9 +21,18 @@ export default function Register() {
             return
         }
 
+        if (form.password !== form.confirmPassword) {
+            setError('Passwords do not match.')
+            return
+        }
+
         setLoading(true)
         try {
-            const res = await api.post('/api/auth/register', form)
+            const res = await api.post('/api/auth/register', {
+                name: form.name,
+                username: form.username,
+                password: form.password,
+            })
             localStorage.setItem('token', res.data.token)
             localStorage.setItem('username', res.data.username)
             localStorage.setItem('name', res.data.name)
@@ -39,13 +48,11 @@ export default function Register() {
         <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
             <div className="w-full max-w-sm">
 
-                {/* Logo */}
                 <div className="mb-8 text-center">
                     <h1 className="text-3xl font-bold text-white tracking-tight">LastRep</h1>
                     <p className="text-gray-500 text-sm mt-1">by chrkk</p>
                 </div>
 
-                {/* Card */}
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">
                     <h2 className="text-white font-semibold text-lg mb-6">Create your account</h2>
 
@@ -90,6 +97,20 @@ export default function Register() {
                                 value={form.password}
                                 onChange={handleChange}
                                 placeholder="Min. 6 characters"
+                                required
+                                minLength={6}
+                                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-gray-400 text-sm mb-1.5">Confirm password</label>
+                            <input
+                                type="password"
+                                name="confirmPassword"
+                                value={form.confirmPassword}
+                                onChange={handleChange}
+                                placeholder="Re-enter your password"
                                 required
                                 minLength={6}
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
