@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import Navbar from '../components/Navbar'
+import Toast from '../components/Toast'
 
 export default function Routines() {
     const navigate = useNavigate()
@@ -14,6 +15,8 @@ export default function Routines() {
     const [saving, setSaving] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [deleting, setDeleting] = useState(false)
+    const [duplicating, setDuplicating] = useState(null)
+    const [toast, setToast] = useState(null)
 
     useEffect(() => {
         fetchRoutines()
@@ -84,8 +87,6 @@ export default function Routines() {
         }
     }
 
-    const [duplicating, setDuplicating] = useState(null)
-
     async function handleDuplicate(routine, e) {
         e.stopPropagation()
         setDuplicating(routine.id)
@@ -124,9 +125,14 @@ export default function Routines() {
         <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
 
+            <Toast
+                message={toast?.message}
+                type={toast?.type}
+                onDismiss={() => setToast(null)}
+            />
+
             <div className="px-4 py-6">
 
-                {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Routines</h1>
@@ -139,7 +145,6 @@ export default function Routines() {
                         + Add
                     </button>
                 </div>
-
 
                 {loading ? (
                     <div className="text-gray-600 text-sm text-center py-16">
@@ -163,11 +168,10 @@ export default function Routines() {
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        {/* Day badge */}
                                         <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-orange-400 text-sm font-bold">
-                        {DAY_LABELS[index] || index + 1}
-                      </span>
+                                            <span className="text-orange-400 text-sm font-bold">
+                                                {DAY_LABELS[index] || index + 1}
+                                            </span>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-white font-medium text-sm truncate">
@@ -181,6 +185,13 @@ export default function Routines() {
                                         </div>
                                     </div>
                                     <div className="flex gap-1 flex-shrink-0">
+                                        <button
+                                            onClick={(e) => handleDuplicate(routine, e)}
+                                            disabled={duplicating === routine.id}
+                                            className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors disabled:opacity-50"
+                                        >
+                                            {duplicating === routine.id ? '...' : 'Copy'}
+                                        </button>
                                         <button
                                             onClick={(e) => openEditForm(routine, e)}
                                             className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
@@ -205,7 +216,6 @@ export default function Routines() {
                     </div>
                 )}
             </div>
-
 
             {showForm && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -278,28 +288,6 @@ export default function Routines() {
                     </div>
                 </div>
             )}
-
-            <div className="flex gap-1 flex-shrink-0">
-                <button
-                    onClick={(e) => handleDuplicate(routine, e)}
-                    disabled={duplicating === routine.id}
-                    className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                    {duplicating === routine.id ? '...' : 'Copy'}
-                </button>
-                <button
-                    onClick={(e) => openEditForm(routine, e)}
-                    className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
-                >
-                    Edit
-                </button>
-                <button
-                    onClick={(e) => { e.stopPropagation(); confirmDelete(routine) }}
-                    className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
-                >
-                    Delete
-                </button>
-            </div>
 
             {deleteTarget && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
