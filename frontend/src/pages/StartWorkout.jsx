@@ -44,6 +44,8 @@ export default function StartWorkout() {
         return () => { document.body.style.overflow = '' }
     }, [showFinishModal, showAddExercise, menuExercise, showReplaceFor])
 
+    const [loadError, setLoadError] = useState(false)
+
     async function fetchSession() {
         try {
             const res = await api.get(`/api/workout-sessions/${sessionId}`)
@@ -52,6 +54,7 @@ export default function StartWorkout() {
             initMeta(res.data.exercises)
         } catch (err) {
             console.error('Failed to fetch session', err)
+            setLoadError(true)
         } finally {
             setLoading(false)
         }
@@ -272,6 +275,26 @@ export default function StartWorkout() {
         return (
             <div className="min-h-screen bg-gray-950 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        )
+    }
+
+    if (loadError || !session) {
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+                <div className="text-center">
+                    <p className="text-4xl mb-3">⚠️</p>
+                    <p className="text-white font-semibold mb-1">Couldn't load this workout</p>
+                    <p className="text-gray-500 text-sm mb-5">
+                        It may not exist or you may not have access to it.
+                    </p>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="bg-orange-500 active:bg-orange-600 text-white font-medium px-6 py-3 rounded-xl transition-colors"
+                    >
+                        Back to Dashboard
+                    </button>
+                </div>
             </div>
         )
     }
