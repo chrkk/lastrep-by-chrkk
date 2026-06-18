@@ -121,6 +121,43 @@ public class RoutineService {
         return new RoutineResponse(routineRepository.save(routine));
     }
 
+    @Transactional
+    public RoutineResponse duplicateRoutine(Long routineId) {
+        User user = userService.getCurrentUser();
+        Routine original = routineRepository.findByIdAndUserId(routineId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Routine not found"));
+
+        Routine copy = new Routine();
+        copy.setUser(user);
+        copy.setName(original.getName() + " (Copy)");
+        copy.setDescription(original.getDescription());
+
+        int maxOrder = routineRepository.findByUserIdOrderByRoutineOrderAsc(user.getId())
+                .stream()
+                .map(Routine::getRoutineOrder)
+                .filter(o -> o != null)
+                .max(Integer::compareTo)
+                .orElse(-1);
+        copy.setRoutineOrder(maxOrder + 1);
+
+        copy = routineRepository.save(copy);
+
+        int index = 0;
+        for (RoutineExercise originalRe : original.getRoutineExercises()) {
+            RoutineExercise newRe = new RoutineExercise();
+            newRe.setRoutine(copy);
+            newRe.setExercise(originalRe.getExercise());
+            newRe.setOrderIndex(index++);
+            newRe.setTargetSets(originalRe.getTargetSets());
+            newRe.setTargetMinReps(originalRe.getTargetMinReps());
+            newRe.setTargetMaxReps(originalRe.getTargetMaxReps());
+            newRe.setRestSeconds(originalRe.getRestSeconds());
+            copy.getRoutineExercises().add(newRe);
+        }
+
+        return new RoutineResponse(routineRepository.save(copy));
+    }
+
     public void removeExercise(Long routineId, Long routineExerciseId) {
         User user = userService.getCurrentUser();
         Routine routine = routineRepository.findByIdAndUserId(routineId, user.getId())
