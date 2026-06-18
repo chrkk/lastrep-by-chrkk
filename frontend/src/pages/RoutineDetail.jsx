@@ -169,38 +169,52 @@ export default function RoutineDetail() {
                 onDismiss={() => setToast(null)}
             />
 
-            <div className="px-4 py-6">
-
-                <div className="mb-6">
+            <div className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3">
+                <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate('/routines')}
-                        className="text-gray-500 text-xs mb-3 flex items-center gap-1"
+                        className="w-9 h-9 flex items-center justify-center text-gray-400 active:text-white active:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
                     >
-                        ← Back to Routines
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
                     </button>
-                    <h1 className="text-xl font-bold text-white">{routine.name}</h1>
-                    {routine.description && (
-                        <p className="text-gray-500 text-xs mt-1">{routine.description}</p>
-                    )}
-                    <p className="text-gray-600 text-xs mt-1">
-                        {routine.exercises?.length === 0
-                            ? 'No exercises yet'
-                            : `${routine.exercises?.length} exercise${routine.exercises?.length !== 1 ? 's' : ''}`}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-white font-bold text-base truncate">{routine.name}</h1>
+                        <p className="text-gray-500 text-xs">
+                            {routine.exercises?.length === 0
+                                ? 'No exercises yet'
+                                : `${routine.exercises?.length} exercise${routine.exercises?.length !== 1 ? 's' : ''}`}
+                        </p>
+                    </div>
                 </div>
+            </div>
+
+            <div className="px-4 py-6">
+
+                {routine.description && (
+                    <p className="text-gray-500 text-sm mb-5">{routine.description}</p>
+                )}
 
                 {routine.exercises?.length > 0 && (
                     <button
                         onClick={() => navigate(`/workout/new?routineId=${routine.id}`)}
-                        className="w-full bg-orange-500 active:bg-orange-600 text-white font-semibold py-4 rounded-2xl text-sm mb-6 transition-colors"
+                        className="w-full bg-orange-500 active:bg-orange-600 text-white font-semibold py-4 rounded-2xl text-sm mb-6 transition-colors flex items-center justify-center gap-2"
                     >
-                        Start Workout 💪
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                        </svg>
+                        Start Workout
                     </button>
                 )}
 
                 {routine.exercises?.length === 0 ? (
                     <div className="text-center py-12">
-                        <p className="text-4xl mb-3">🏋️</p>
+                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                            </svg>
+                        </div>
                         <p className="text-gray-500 text-sm">No exercises in this routine.</p>
                         <p className="text-gray-600 text-xs mt-1">
                             Tap + Add Exercise to get started.
