@@ -4,7 +4,8 @@ import com.lastrep.backend.dto.*;
 import com.lastrep.backend.model.*;
 import com.lastrep.backend.repository.*;
 import org.springframework.stereotype.Service;
-
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -95,6 +96,27 @@ public class RoutineService {
         re.setRestSeconds(request.getRestSeconds() != null ? request.getRestSeconds() : 90);
 
         routine.getRoutineExercises().add(re);
+        return new RoutineResponse(routineRepository.save(routine));
+    }
+
+    @Transactional
+    public RoutineResponse reorderExercises(Long routineId, List<Long> routineExerciseIds) {
+        User user = userService.getCurrentUser();
+        Routine routine = routineRepository.findByIdAndUserId(routineId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Routine not found"));
+
+        Map<Long, RoutineExercise> byId = routine.getRoutineExercises().stream()
+                .collect(Collectors.toMap(RoutineExercise::getId, re -> re));
+
+        int index = 0;
+        for (Long reId : routineExerciseIds) {
+            RoutineExercise re = byId.get(reId);
+            if (re == null) {
+                throw new RuntimeException("Routine exercise not found: " + reId);
+            }
+            re.setOrderIndex(index++);
+        }
+
         return new RoutineResponse(routineRepository.save(routine));
     }
 
