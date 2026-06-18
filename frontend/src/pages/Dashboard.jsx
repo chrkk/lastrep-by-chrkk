@@ -69,7 +69,7 @@ export default function Dashboard() {
 
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold text-white">
-                        Hey, {name} 👋
+                        Hey, {name}
                     </h1>
                     <p className="text-gray-500 text-sm mt-1">
                         {loading ? 'Loading...' : isNewUser
@@ -82,7 +82,11 @@ export default function Dashboard() {
 
                 {isNewUser ? (
                     <div className="bg-gray-900 border border-orange-500/20 rounded-2xl p-5 mb-6">
-                        <p className="text-3xl mb-3">👋</p>
+                        <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
+                            <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
                         <h2 className="text-white font-bold text-lg mb-1">
                             Welcome to LastRep
                         </h2>
@@ -126,7 +130,11 @@ export default function Dashboard() {
                     </div>
                 ) : needsRoutine ? (
                     <div className="bg-gray-900 border border-orange-500/20 rounded-2xl p-5 mb-6">
-                        <p className="text-3xl mb-3">📋</p>
+                        <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
+                            <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                        </div>
                         <h2 className="text-white font-bold text-lg mb-1">
                             One more step
                         </h2>
@@ -148,14 +156,26 @@ export default function Dashboard() {
                                 disabled={starting}
                                 className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-bold py-5 rounded-2xl mb-2 transition-colors"
                             >
-                                {starting ? 'Starting...' : `💪 Start ${dashboard.suggestedRoutineName}`}
+                                {starting ? 'Starting...' : (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                                        </svg>
+                                        Start {dashboard.suggestedRoutineName}
+                                    </span>
+                                )}
                             </button>
                         ) : (
                             <button
                                 onClick={() => navigate('/select-routine')}
                                 className="w-full bg-orange-500 active:bg-orange-600 text-white font-bold py-5 rounded-2xl mb-2 transition-colors"
                             >
-                                💪 Start Workout
+                                <span className="flex items-center justify-center gap-2">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                                    </svg>
+                                    Start Workout
+                                </span>
                             </button>
                         )}
 
@@ -194,7 +214,11 @@ export default function Dashboard() {
                         onClick={() => navigate('/routines')}
                         className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5 text-left active:bg-gray-800 transition-colors"
                     >
-                        <p className="text-2xl mb-2">📋</p>
+                        <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
+                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7a2 2 0 012-2h2a2 2 0 012 2v10M9 17H7a2 2 0 01-2-2V9a2 2 0 012-2h2m6 10h2a2 2 0 002-2V9a2 2 0 00-2-2h-2" />
+                            </svg>
+                        </div>
                         <p className="text-white text-sm font-medium">Routines</p>
                         <p className="text-gray-500 text-xs mt-0.5">Manage programs</p>
                     </button>
@@ -202,7 +226,11 @@ export default function Dashboard() {
                         onClick={() => navigate('/exercises')}
                         className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5 text-left active:bg-gray-800 transition-colors"
                     >
-                        <p className="text-2xl mb-2">🏋️</p>
+                        <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
+                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                            </svg>
+                        </div>
                         <p className="text-white text-sm font-medium">Exercises</p>
                         <p className="text-gray-500 text-xs mt-0.5">Exercise library</p>
                     </button>
@@ -210,12 +238,20 @@ export default function Dashboard() {
                         onClick={() => navigate('/history')}
                         className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5 text-left active:bg-gray-800 transition-colors"
                     >
-                        <p className="text-2xl mb-2">📅</p>
+                        <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
+                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
                         <p className="text-white text-sm font-medium">History</p>
                         <p className="text-gray-500 text-xs mt-0.5">Past workouts</p>
                     </button>
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5">
-                        <p className="text-2xl mb-2">📈</p>
+                        <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
+                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
+                            </svg>
+                        </div>
                         <p className="text-white text-sm font-medium">Progress</p>
                         <p className="text-gray-500 text-xs mt-0.5">Coming soon</p>
                     </div>
