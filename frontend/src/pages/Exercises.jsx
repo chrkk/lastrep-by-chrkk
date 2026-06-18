@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
 import Navbar from '../components/Navbar'
+import Toast from '../components/Toast'
 
 const MUSCLE_GROUPS = [
     'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps',
@@ -20,20 +21,19 @@ export default function Exercises() {
     const [form, setForm] = useState({ name: '', muscleGroup: '', equipment: '' })
     const [error, setError] = useState('')
     const [saving, setSaving] = useState(false)
+    const [deleteTarget, setDeleteTarget] = useState(null)
+    const [deleting, setDeleting] = useState(false)
+    const [toast, setToast] = useState(null)
 
     useEffect(() => {
         fetchExercises()
     }, [])
 
-    // Lock body scroll when modal is open
     useEffect(() => {
-        if (showForm) {
-            document.body.style.overflow = 'hidden'
-        } else {
-            document.body.style.overflow = ''
-        }
+        const open = showForm || deleteTarget !== null
+        document.body.style.overflow = open ? 'hidden' : ''
         return () => { document.body.style.overflow = '' }
-    }, [showForm])
+    }, [showForm, deleteTarget])
 
     async function fetchExercises() {
         try {
@@ -94,13 +94,22 @@ export default function Exercises() {
         }
     }
 
-    async function handleDelete(id) {
-        if (!confirm('Delete this exercise?')) return
+    function confirmDelete(exercise) {
+        setDeleteTarget(exercise)
+    }
+
+    async function handleDelete() {
+        if (!deleteTarget) return
+        setDeleting(true)
         try {
-            await api.delete(`/api/exercises/${id}`)
-            setExercises(exercises.filter(e => e.id !== id))
+            await api.delete(`/api/exercises/${deleteTarget.id}`)
+            setExercises(prev => prev.filter(e => e.id !== deleteTarget.id))
         } catch (err) {
             console.error('Failed to delete exercise', err)
+            setToast({ message: 'Failed to delete exercise. Try again.', type: 'error' })
+        } finally {
+            setDeleting(false)
+            setDeleteTarget(null)
         }
     }
 
@@ -108,9 +117,14 @@ export default function Exercises() {
         <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
 
+            <Toast
+                message={toast?.message}
+                type={toast?.type}
+                onDismiss={() => setToast(null)}
+            />
+
             <div className="px-4 py-6">
 
-                {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Exercises</h1>
@@ -124,7 +138,6 @@ export default function Exercises() {
                     </button>
                 </div>
 
-                {/* Exercise List */}
                 {loading ? (
                     <div className="text-gray-600 text-sm text-center py-16">
                         Loading...
@@ -152,28 +165,34 @@ export default function Exercises() {
                                         <div className="flex flex-wrap gap-1.5 mt-2">
                                             {exercise.muscleGroup && (
                                                 <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
-                          {exercise.muscleGroup}
-                        </span>
+                                                    {exercise.muscleGroup}
+                                                </span>
                                             )}
                                             {exercise.equipment && (
                                                 <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
-                          {exercise.equipment}
-                        </span>
+                                                    {exercise.equipment}
+                                                </span>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex gap-1 flex-shrink-0">
+                                    <div className="flex items-center gap-1 flex-shrink-0">
                                         <button
                                             onClick={() => openEditForm(exercise)}
-                                            className="text-gray-500 active:text-white text-xs px-3 py-1.5 rounded-lg active:bg-gray-800 transition-colors"
+                                            title="Edit"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-white active:bg-gray-800 rounded-lg transition-colors"
                                         >
-                                            Edit
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
                                         </button>
                                         <button
-                                            onClick={() => handleDelete(exercise.id)}
-                                            className="text-gray-500 active:text-red-400 text-xs px-3 py-1.5 rounded-lg active:bg-gray-800 transition-colors"
+                                            onClick={() => confirmDelete(exercise)}
+                                            title="Delete"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-red-400 active:bg-red-500/10 rounded-lg transition-colors"
                                         >
-                                            Delete
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
                                         </button>
                                     </div>
                                 </div>
@@ -183,10 +202,8 @@ export default function Exercises() {
                 )}
             </div>
 
-            {/* Bottom Sheet Modal */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/70"
                         onClick={closeForm}
@@ -194,7 +211,6 @@ export default function Exercises() {
 
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
 
-                        {/* Handle bar */}
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
 
                         <h2 className="text-white font-semibold text-lg mb-5">
@@ -275,6 +291,47 @@ export default function Exercises() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/70"
+                        onClick={() => setDeleteTarget(null)}
+                    />
+                    <div
+                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
+                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+                    >
+                        <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
+                        <div className="text-center mb-6">
+                            <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h2 className="text-white font-bold text-lg">Delete exercise?</h2>
+                            <p className="text-gray-500 text-sm mt-1">
+                                "{deleteTarget.name}" will be permanently removed
+                            </p>
+                        </div>
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="w-full bg-red-500/10 active:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold py-4 rounded-2xl transition-colors disabled:opacity-50"
+                            >
+                                {deleting ? 'Deleting...' : 'Delete Exercise'}
+                            </button>
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                className="w-full bg-gray-800 active:bg-gray-700 text-gray-400 font-medium py-4 rounded-2xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

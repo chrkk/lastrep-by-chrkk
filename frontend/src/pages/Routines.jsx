@@ -184,25 +184,38 @@ export default function Routines() {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex gap-1 flex-shrink-0">
+                                    <div className="flex items-center gap-1 flex-shrink-0">
                                         <button
                                             onClick={(e) => handleDuplicate(routine, e)}
                                             disabled={duplicating === routine.id}
-                                            className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors disabled:opacity-50"
+                                            title="Duplicate"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-orange-400 active:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
                                         >
-                                            {duplicating === routine.id ? '...' : 'Copy'}
+                                            {duplicating === routine.id ? (
+                                                <div className="w-3.5 h-3.5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V5a2 2 0 012-2h9a2 2 0 012 2v9a2 2 0 01-2 2h-2M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2" />
+                                                </svg>
+                                            )}
                                         </button>
                                         <button
                                             onClick={(e) => openEditForm(routine, e)}
-                                            className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
+                                            title="Edit"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-white active:bg-gray-800 rounded-lg transition-colors"
                                         >
-                                            Edit
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); confirmDelete(routine) }}
-                                            className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
+                                            title="Delete"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-red-400 active:bg-red-500/10 rounded-lg transition-colors"
                                         >
-                                            Delete
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
                                         </button>
                                     </div>
                                 </div>
