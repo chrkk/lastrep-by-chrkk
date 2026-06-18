@@ -104,12 +104,13 @@ export default function Exercises() {
         try {
             await api.delete(`/api/exercises/${deleteTarget.id}`)
             setExercises(prev => prev.filter(e => e.id !== deleteTarget.id))
+            setDeleteTarget(null)
         } catch (err) {
             console.error('Failed to delete exercise', err)
-            setToast({ message: 'Failed to delete exercise. Try again.', type: 'error' })
+            const message = err.response?.data?.message || 'Failed to delete exercise. Try again.'
+            setToast({ message, type: 'error' })
         } finally {
             setDeleting(false)
-            setDeleteTarget(null)
         }
     }
 
