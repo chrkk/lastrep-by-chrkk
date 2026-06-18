@@ -75,7 +75,7 @@ export default function StartWorkout() {
             sessionExercises.map(async se => {
                 try {
                     const res = await api.get(
-                        `/api/workout-sessions/exercises/${se.exerciseId}/last-performance`
+                        `/api/exercise-performance/${se.exerciseId}/last`
                     )
                     if (res.status === 200 && res.data) {
                         performances[se.exerciseId] = res.data
@@ -164,7 +164,7 @@ export default function StartWorkout() {
                 }))
                 try {
                     const perfRes = await api.get(
-                        `/api/workout-sessions/exercises/${exerciseId}/last-performance`
+                        `/api/exercise-performance/${exerciseId}/last`
                     )
                     if (perfRes.status === 200 && perfRes.data) {
                         setLastPerformances(prev => ({
@@ -173,19 +173,8 @@ export default function StartWorkout() {
                         }))
                     }
                 } catch (err) {
-                    console.error('Failed to add exercise', err)
-                    setToast({
-                        message: 'Failed to add exercise. Try again.',
-                        type: 'error'
-                    })
+                    console.error('Failed to fetch last performance', err)
                 }
-            }
-            setSession(res.data)
-            setShowAddExercise(false)
-            setShowReplaceFor(null)
-        } catch (err) {
-            console.error('Failed to add exercise', err)
-        }
     }
 
     async function handleFinish() {
