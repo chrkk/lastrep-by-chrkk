@@ -8,7 +8,7 @@ import com.lastrep.backend.repository.ExerciseRepository;
 import com.lastrep.backend.repository.RoutineExerciseRepository;
 import com.lastrep.backend.repository.WorkoutSessionExerciseRepository;
 import org.springframework.stereotype.Service;
-
+import com.lastrep.backend.exception.ExerciseInUseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
