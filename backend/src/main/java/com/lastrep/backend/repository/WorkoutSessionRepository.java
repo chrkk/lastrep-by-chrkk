@@ -10,5 +10,6 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     List<WorkoutSession> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, SessionStatus status);
     List<WorkoutSession> findByUserIdOrderByCreatedAtDesc(Long userId);
     Optional<WorkoutSession> findByIdAndUserId(Long id, Long userId);
+    List<WorkoutSession> findByRoutineId(Long routineId);
     Optional<WorkoutSession> findFirstByUserIdAndStatusOrderByCreatedAtDesc(Long userId, SessionStatus status);
 }
