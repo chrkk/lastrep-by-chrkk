@@ -6,4 +6,5 @@ import java.util.Optional;
 
 public interface RoutineExerciseRepository extends JpaRepository<RoutineExercise, Long> {
     Optional<RoutineExercise> findByIdAndRoutineId(Long id, Long routineId);
+    boolean existsByExerciseId(Long exerciseId);
 }

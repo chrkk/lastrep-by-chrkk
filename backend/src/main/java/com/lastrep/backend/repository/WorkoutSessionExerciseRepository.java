@@ -6,4 +6,5 @@ import java.util.Optional;
 
 public interface WorkoutSessionExerciseRepository extends JpaRepository<WorkoutSessionExercise, Long> {
     Optional<WorkoutSessionExercise> findByIdAndWorkoutSessionId(Long id, Long sessionId);
+    boolean existsByExerciseId(Long exerciseId);
 }
