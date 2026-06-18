@@ -175,6 +175,17 @@ export default function StartWorkout() {
                 } catch (err) {
                     console.error('Failed to fetch last performance', err)
                 }
+            }
+            setSession(res.data)
+            setShowAddExercise(false)
+            setShowReplaceFor(null)
+        } catch (err) {
+            console.error('Failed to add exercise', err)
+            setToast({
+                message: 'Failed to add exercise. Try again.',
+                type: 'error'
+            })
+        }
     }
 
     async function handleFinish() {
