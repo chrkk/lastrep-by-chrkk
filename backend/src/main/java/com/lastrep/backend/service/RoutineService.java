@@ -16,15 +16,18 @@ public class RoutineService {
     private final RoutineRepository routineRepository;
     private final RoutineExerciseRepository routineExerciseRepository;
     private final ExerciseRepository exerciseRepository;
+    private final WorkoutSessionRepository workoutSessionRepository;
     private final UserService userService;
 
     public RoutineService(RoutineRepository routineRepository,
                           RoutineExerciseRepository routineExerciseRepository,
                           ExerciseRepository exerciseRepository,
+                          WorkoutSessionRepository workoutSessionRepository,
                           UserService userService) {
         this.routineRepository = routineRepository;
         this.routineExerciseRepository = routineExerciseRepository;
         this.exerciseRepository = exerciseRepository;
+        this.workoutSessionRepository = workoutSessionRepository;
         this.userService = userService;
     }
 
@@ -70,10 +73,18 @@ public class RoutineService {
         return new RoutineResponse(routineRepository.save(routine));
     }
 
+    @Transactional
     public void deleteRoutine(Long id) {
         User user = userService.getCurrentUser();
         Routine routine = routineRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new RuntimeException("Routine not found"));
+
+        List<WorkoutSession> sessions = workoutSessionRepository.findByRoutineId(id);
+        for (WorkoutSession session : sessions) {
+            session.setRoutine(null);
+        }
+        workoutSessionRepository.saveAll(sessions);
+
         routineRepository.delete(routine);
     }
 
