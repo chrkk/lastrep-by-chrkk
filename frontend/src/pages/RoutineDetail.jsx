@@ -398,6 +398,7 @@ export default function RoutineDetail() {
                                             })}
                                             min="1"
                                             max="100"
+                                            autoComplete="off"
                                             className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm text-center focus:outline-none focus:border-orange-500"
                                         />
                                     </div>

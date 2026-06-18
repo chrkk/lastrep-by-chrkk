@@ -263,6 +263,7 @@ export default function Routines() {
                                     placeholder="e.g. Push Day"
                                     required
                                     autoFocus
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>
@@ -278,6 +279,7 @@ export default function Routines() {
                                     value={form.description}
                                     onChange={handleChange}
                                     placeholder="e.g. Chest, shoulders, triceps"
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>

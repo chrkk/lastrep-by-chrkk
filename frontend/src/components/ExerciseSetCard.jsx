@@ -393,6 +393,7 @@ export default function ExerciseSetCard({
                                         value={drop.weight}
                                         onChange={e => updateDrop(di, 'weight', e.target.value)}
                                         placeholder="Weight"
+                                        autoComplete="off"
                                         className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
                                     />
                                     <button
@@ -410,6 +411,7 @@ export default function ExerciseSetCard({
                                         value={drop.reps}
                                         onChange={e => updateDrop(di, 'reps', e.target.value)}
                                         placeholder="Reps"
+                                        autoComplete="off"
                                         className="w-14 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 flex-shrink-0"
                                     />
                                     {dropRows.length > 1 && (

@@ -237,6 +237,7 @@ export default function Exercises() {
                                     placeholder="e.g. Bench Press"
                                     required
                                     autoFocus
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>
