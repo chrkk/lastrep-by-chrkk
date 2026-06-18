@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import Navbar from '../components/Navbar'
+import Toast from '../components/Toast'
 
 export default function RoutineDetail() {
     const { id } = useParams()
@@ -13,14 +14,19 @@ export default function RoutineDetail() {
     const [showAddExercise, setShowAddExercise] = useState(false)
     const [showTargetForm, setShowTargetForm] = useState(false)
     const [selectedExercise, setSelectedExercise] = useState(null)
+    const [removeTarget, setRemoveTarget] = useState(null)
+    const [removing, setRemoving] = useState(false)
     const [targetForm, setTargetForm] = useState({
         exerciseId: '',
         targetSets: 3,
         targetMinReps: 8,
-        targetMaxReps: 12
+        targetMaxReps: 12,
+        restSeconds: 90
     })
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    const [toast, setToast] = useState(null)
+    const [reordering, setReordering] = useState(false)
 
     useEffect(() => {
         fetchRoutine()
@@ -28,10 +34,10 @@ export default function RoutineDetail() {
     }, [id])
 
     useEffect(() => {
-        const open = showAddExercise || showTargetForm
+        const open = showAddExercise || showTargetForm || removeTarget !== null
         document.body.style.overflow = open ? 'hidden' : ''
         return () => { document.body.style.overflow = '' }
-    }, [showAddExercise, showTargetForm])
+    }, [showAddExercise, showTargetForm, removeTarget])
 
     async function fetchRoutine() {
         try {
@@ -88,16 +94,48 @@ export default function RoutineDetail() {
         }
     }
 
-    async function handleRemoveExercise(routineExerciseId) {
-        if (!confirm('Remove this exercise from the routine?')) return
+    function confirmRemoveExercise(re) {
+        setRemoveTarget(re)
+    }
+
+    async function handleRemoveExercise() {
+        if (!removeTarget) return
+        setRemoving(true)
         try {
-            await api.delete(`/api/routines/${id}/exercises/${routineExerciseId}`)
+            await api.delete(`/api/routines/${id}/exercises/${removeTarget.id}`)
             await fetchRoutine()
         } catch (err) {
             console.error('Failed to remove exercise', err)
+            setToast({ message: 'Failed to remove exercise. Try again.', type: 'error' })
+        } finally {
+            setRemoving(false)
+            setRemoveTarget(null)
         }
     }
 
+    function moveExercise(index, direction) {
+        if (reordering) return
+        const newIndex = index + direction
+        if (newIndex < 0 || newIndex >= routine.exercises.length) return
+
+        const previousOrder = routine.exercises
+
+        const reordered = [...routine.exercises]
+        const [moved] = reordered.splice(index, 1)
+        reordered.splice(newIndex, 0, moved)
+
+        setRoutine(prev => ({ ...prev, exercises: reordered }))
+        setReordering(true)
+
+        const orderedIds = reordered.map(re => re.id)
+        api.put(`/api/routines/${id}/exercises/reorder`, orderedIds)
+            .catch(err => {
+                console.error('Failed to reorder', err)
+                setRoutine(prev => ({ ...prev, exercises: previousOrder }))
+                setToast({ message: 'Failed to save order. Try again.', type: 'error' })
+            })
+            .finally(() => setReordering(false))
+    }
 
     const availableExercises = exercises.filter(
         ex => !routine?.exercises?.some(re => re.exerciseId === ex.id)
@@ -125,8 +163,13 @@ export default function RoutineDetail() {
         <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
 
-            <div className="px-4 py-6">
+            <Toast
+                message={toast?.message}
+                type={toast?.type}
+                onDismiss={() => setToast(null)}
+            />
 
+            <div className="px-4 py-6">
 
                 <div className="mb-6">
                     <button
@@ -146,7 +189,6 @@ export default function RoutineDetail() {
                     </p>
                 </div>
 
-
                 {routine.exercises?.length > 0 && (
                     <button
                         onClick={() => navigate(`/workout/new?routineId=${routine.id}`)}
@@ -155,7 +197,6 @@ export default function RoutineDetail() {
                         Start Workout 💪
                     </button>
                 )}
-
 
                 {routine.exercises?.length === 0 ? (
                     <div className="text-center py-12">
@@ -174,11 +215,30 @@ export default function RoutineDetail() {
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        {/* Order number */}
+                                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                                            <button
+                                                onClick={() => moveExercise(index, -1)}
+                                                disabled={index === 0 || reordering}
+                                                className="text-gray-500 disabled:opacity-20 active:text-orange-400 transition-colors"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => moveExercise(index, 1)}
+                                                disabled={index === routine.exercises.length - 1 || reordering}
+                                                className="text-gray-500 disabled:opacity-20 active:text-orange-400 transition-colors"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                         <div className="w-7 h-7 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0">
-                      <span className="text-gray-400 text-xs font-medium">
-                        {index + 1}
-                      </span>
+                                            <span className="text-gray-400 text-xs font-medium">
+                                                {index + 1}
+                                            </span>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-white font-medium text-sm truncate">
@@ -187,21 +247,21 @@ export default function RoutineDetail() {
                                             <div className="flex flex-wrap gap-2 mt-1">
                                                 {re.muscleGroup && (
                                                     <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
-                            {re.muscleGroup}
-                          </span>
+                                                        {re.muscleGroup}
+                                                    </span>
                                                 )}
                                                 {re.targetSets && (
                                                     <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
-                            {re.targetSets} sets
+                                                        {re.targetSets} sets
                                                         {re.targetMinReps && ` × ${re.targetMinReps}`}
                                                         {re.targetMaxReps && `–${re.targetMaxReps} reps`}
-                          </span>
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
                                     <button
-                                        onClick={() => handleRemoveExercise(re.id)}
+                                        onClick={() => confirmRemoveExercise(re)}
                                         className="text-gray-600 text-xs px-3 py-1.5 rounded-lg active:bg-gray-800 transition-colors flex-shrink-0"
                                     >
                                         Remove
@@ -212,7 +272,6 @@ export default function RoutineDetail() {
                     </div>
                 )}
 
-
                 <button
                     onClick={openAddExercise}
                     className="w-full border border-dashed border-gray-700 active:border-gray-600 text-gray-500 active:text-gray-400 text-sm py-4 rounded-2xl transition-colors"
@@ -220,7 +279,6 @@ export default function RoutineDetail() {
                     + Add Exercise
                 </button>
             </div>
-
 
             {showAddExercise && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -239,8 +297,7 @@ export default function RoutineDetail() {
                             </p>
                         </div>
 
-
-                        <div className="overflow-y-auto px-5 pb-10">
+                        <div className="overflow-y-auto px-5" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                             {availableExercises.length === 0 ? (
                                 <div className="text-center py-8">
                                     <p className="text-gray-500 text-sm">
@@ -261,13 +318,13 @@ export default function RoutineDetail() {
                                             <div className="flex gap-2 mt-1">
                                                 {exercise.muscleGroup && (
                                                     <span className="text-xs text-orange-400">
-                            {exercise.muscleGroup}
-                          </span>
+                                                        {exercise.muscleGroup}
+                                                    </span>
                                                 )}
                                                 {exercise.equipment && (
                                                     <span className="text-xs text-gray-500">
-                            {exercise.equipment}
-                          </span>
+                                                        {exercise.equipment}
+                                                    </span>
                                                 )}
                                             </div>
                                         </button>
@@ -278,7 +335,6 @@ export default function RoutineDetail() {
                     </div>
                 </div>
             )}
-
 
             {showTargetForm && selectedExercise && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -325,7 +381,6 @@ export default function RoutineDetail() {
                                     ))}
                                 </div>
                             </div>
-
 
                             <div>
                                 <label className="block text-gray-400 text-sm mb-3">
@@ -403,6 +458,47 @@ export default function RoutineDetail() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {removeTarget && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/70"
+                        onClick={() => setRemoveTarget(null)}
+                    />
+                    <div
+                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
+                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+                    >
+                        <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
+                        <div className="text-center mb-6">
+                            <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h2 className="text-white font-bold text-lg">Remove exercise?</h2>
+                            <p className="text-gray-500 text-sm mt-1">
+                                "{removeTarget.exerciseName}" will be removed from this routine
+                            </p>
+                        </div>
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleRemoveExercise}
+                                disabled={removing}
+                                className="w-full bg-red-500/10 active:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold py-4 rounded-2xl transition-colors disabled:opacity-50"
+                            >
+                                {removing ? 'Removing...' : 'Remove Exercise'}
+                            </button>
+                            <button
+                                onClick={() => setRemoveTarget(null)}
+                                className="w-full bg-gray-800 active:bg-gray-700 text-gray-400 font-medium py-4 rounded-2xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
