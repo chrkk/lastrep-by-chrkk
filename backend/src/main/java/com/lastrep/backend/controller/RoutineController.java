@@ -35,6 +35,11 @@ public class RoutineController {
         return ResponseEntity.ok(routineService.createRoutine(request));
     }
 
+    @PostMapping("/{routineId}/duplicate")
+    public ResponseEntity<RoutineResponse> duplicate(@PathVariable Long routineId) {
+        return ResponseEntity.ok(routineService.duplicateRoutine(routineId));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<RoutineResponse> update(
             @PathVariable Long id,
