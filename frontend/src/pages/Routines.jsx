@@ -84,6 +84,22 @@ export default function Routines() {
         }
     }
 
+    const [duplicating, setDuplicating] = useState(null)
+
+    async function handleDuplicate(routine, e) {
+        e.stopPropagation()
+        setDuplicating(routine.id)
+        try {
+            await api.post(`/api/routines/${routine.id}/duplicate`)
+            await fetchRoutines()
+        } catch (err) {
+            console.error('Failed to duplicate routine', err)
+            setToast({ message: 'Failed to duplicate routine. Try again.', type: 'error' })
+        } finally {
+            setDuplicating(null)
+        }
+    }
+
     function confirmDelete(routine) {
         setDeleteTarget(routine)
     }
@@ -262,6 +278,28 @@ export default function Routines() {
                     </div>
                 </div>
             )}
+
+            <div className="flex gap-1 flex-shrink-0">
+                <button
+                    onClick={(e) => handleDuplicate(routine, e)}
+                    disabled={duplicating === routine.id}
+                    className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                    {duplicating === routine.id ? '...' : 'Copy'}
+                </button>
+                <button
+                    onClick={(e) => openEditForm(routine, e)}
+                    className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
+                >
+                    Edit
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); confirmDelete(routine) }}
+                    className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
+                >
+                    Delete
+                </button>
+            </div>
 
             {deleteTarget && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
