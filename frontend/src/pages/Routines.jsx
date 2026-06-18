@@ -111,11 +111,12 @@ export default function Routines() {
         try {
             await api.delete(`/api/routines/${deleteTarget.id}`)
             setRoutines(prev => prev.filter(r => r.id !== deleteTarget.id))
+            setDeleteTarget(null)
         } catch (err) {
             console.error('Failed to delete routine', err)
+            setToast({ message: 'Failed to delete routine. Try again.', type: 'error' })
         } finally {
             setDeleting(false)
-            setDeleteTarget(null)
         }
     }
 
