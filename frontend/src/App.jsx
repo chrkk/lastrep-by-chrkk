@@ -1,6 +1,4 @@
-import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { supabase } from './lib/supabase'
 import MobileOnly from './components/MobileOnly'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -15,13 +13,6 @@ import SelectRoutine from './pages/SelectRoutine'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data, error }) => {
-            if (error) console.error('Supabase connection error:', error)
-            else console.log('Supabase connected. Session:', data.session)
-        })
-    }, [])
-
     return (
         <MobileOnly>
             <BrowserRouter>
