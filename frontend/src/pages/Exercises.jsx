@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
@@ -37,8 +37,13 @@ export default function Exercises() {
 
     async function fetchExercises() {
         try {
-            const res = await api.get('/api/exercises')
-            setExercises(res.data)
+            const { data, error: fetchError } = await supabase
+                .from('exercises')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            if (fetchError) throw fetchError
+            setExercises(data)
         } catch (err) {
             console.error('Failed to fetch exercises', err)
         } finally {
@@ -57,7 +62,7 @@ export default function Exercises() {
         setEditingExercise(exercise)
         setForm({
             name: exercise.name,
-            muscleGroup: exercise.muscleGroup || '',
+            muscleGroup: exercise.muscle_group || '',
             equipment: exercise.equipment || ''
         })
         setError('')
@@ -81,13 +86,33 @@ export default function Exercises() {
         setSaving(true)
         try {
             if (editingExercise) {
-                await api.put(`/api/exercises/${editingExercise.id}`, form)
+                const { error: updateError } = await supabase
+                    .from('exercises')
+                    .update({
+                        name: form.name,
+                        muscle_group: form.muscleGroup || null,
+                        equipment: form.equipment || null,
+                    })
+                    .eq('id', editingExercise.id)
+
+                if (updateError) throw updateError
             } else {
-                await api.post('/api/exercises', form)
+                const { data: userData } = await supabase.auth.getUser()
+                const { error: insertError } = await supabase
+                    .from('exercises')
+                    .insert({
+                        user_id: userData.user.id,
+                        name: form.name,
+                        muscle_group: form.muscleGroup || null,
+                        equipment: form.equipment || null,
+                    })
+
+                if (insertError) throw insertError
             }
             await fetchExercises()
             closeForm()
         } catch (err) {
+            console.error(err)
             setError('Failed to save exercise. Please try again.')
         } finally {
             setSaving(false)
@@ -102,15 +127,30 @@ export default function Exercises() {
         if (!deleteTarget) return
         setDeleting(true)
         try {
-            await api.delete(`/api/exercises/${deleteTarget.id}`)
+            const { error: deleteError } = await supabase
+                .from('exercises')
+                .delete()
+                .eq('id', deleteTarget.id)
+
+            if (deleteError) {
+                if (deleteError.code === '23503') {
+                    setToast({
+                        message: 'This exercise is used in a routine or has workout history and can\'t be deleted.',
+                        type: 'error'
+                    })
+                } else {
+                    throw deleteError
+                }
+                return
+            }
+
             setExercises(prev => prev.filter(e => e.id !== deleteTarget.id))
-            setDeleteTarget(null)
         } catch (err) {
             console.error('Failed to delete exercise', err)
-            const message = err.response?.data?.message || 'Failed to delete exercise. Try again.'
-            setToast({ message, type: 'error' })
+            setToast({ message: 'Failed to delete exercise. Try again.', type: 'error' })
         } finally {
             setDeleting(false)
+            setDeleteTarget(null)
         }
     }
 
@@ -164,9 +204,9 @@ export default function Exercises() {
                                             {exercise.name}
                                         </p>
                                         <div className="flex flex-wrap gap-1.5 mt-2">
-                                            {exercise.muscleGroup && (
+                                            {exercise.muscle_group && (
                                                 <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
-                                                    {exercise.muscleGroup}
+                                                    {exercise.muscle_group}
                                                 </span>
                                             )}
                                             {exercise.equipment && (
