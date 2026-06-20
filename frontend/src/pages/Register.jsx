@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 
 export default function Register() {
     const navigate = useNavigate()
-    const [form, setForm] = useState({ name: '', username: '', password: '', confirmPassword: '' })
+    const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -28,17 +28,26 @@ export default function Register() {
 
         setLoading(true)
         try {
-            const res = await api.post('/api/auth/register', {
-                name: form.name,
-                username: form.username,
+            const { data, error: signUpError } = await supabase.auth.signUp({
+                email: form.email,
                 password: form.password,
+                options: {
+                    data: { name: form.name }
+                }
             })
-            localStorage.setItem('token', res.data.token)
-            localStorage.setItem('username', res.data.username)
-            localStorage.setItem('name', res.data.name)
-            navigate('/')
+
+            if (signUpError) {
+                setError(signUpError.message)
+                return
+            }
+
+            if (data.session) {
+                navigate('/')
+            } else {
+                setError('Check your email to confirm your account before logging in.')
+            }
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed. Try a different username.')
+            setError('Registration failed. Please try again.')
         } finally {
             setLoading(false)
         }
@@ -72,19 +81,21 @@ export default function Register() {
                                 onChange={handleChange}
                                 placeholder="Enter Full Name"
                                 required
+                                autoComplete="off"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-gray-400 text-sm mb-1.5">Username</label>
+                            <label className="block text-gray-400 text-sm mb-1.5">Email</label>
                             <input
-                                type="text"
-                                name="username"
-                                value={form.username}
+                                type="email"
+                                name="email"
+                                value={form.email}
                                 onChange={handleChange}
-                                placeholder="Enter Username"
+                                placeholder="you@example.com"
                                 required
+                                autoComplete="off"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
@@ -99,6 +110,7 @@ export default function Register() {
                                 placeholder="Min. 6 characters"
                                 required
                                 minLength={6}
+                                autoComplete="new-password"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
@@ -113,6 +125,7 @@ export default function Register() {
                                 placeholder="Re-enter your password"
                                 required
                                 minLength={6}
+                                autoComplete="new-password"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
