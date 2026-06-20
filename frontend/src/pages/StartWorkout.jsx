@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import ExerciseSetCard from '../components/ExerciseSetCard'
 import ExerciseMenu from '../components/ExerciseMenu'
+import Toast from '../components/Toast'
 
 export default function StartWorkout() {
     const { sessionId } = useParams()
@@ -19,6 +20,7 @@ export default function StartWorkout() {
     const [lastPerformances, setLastPerformances] = useState({})
     const [menuExercise, setMenuExercise] = useState(null)
     const [exerciseMeta, setExerciseMeta] = useState({})
+    const [toast, setToast] = useState(null)
     const timerRef = useRef(null)
 
     useEffect(() => {
@@ -42,6 +44,8 @@ export default function StartWorkout() {
         return () => { document.body.style.overflow = '' }
     }, [showFinishModal, showAddExercise, menuExercise, showReplaceFor])
 
+    const [loadError, setLoadError] = useState(false)
+
     async function fetchSession() {
         try {
             const res = await api.get(`/api/workout-sessions/${sessionId}`)
@@ -50,6 +54,7 @@ export default function StartWorkout() {
             initMeta(res.data.exercises)
         } catch (err) {
             console.error('Failed to fetch session', err)
+            setLoadError(true)
         } finally {
             setLoading(false)
         }
@@ -70,7 +75,7 @@ export default function StartWorkout() {
             sessionExercises.map(async se => {
                 try {
                     const res = await api.get(
-                        `/api/workout-sessions/exercises/${se.exerciseId}/last-performance`
+                        `/api/exercise-performance/${se.exerciseId}/last`
                     )
                     if (res.status === 200 && res.data) {
                         performances[se.exerciseId] = res.data
@@ -122,6 +127,10 @@ export default function StartWorkout() {
             return res.data
         } catch (err) {
             console.error('Failed to log set', err)
+            setToast({
+                message: 'Failed to save set. Check your connection and try again.',
+                type: 'error'
+            })
         }
     }
 
@@ -131,8 +140,13 @@ export default function StartWorkout() {
                 `/api/workout-sessions/${sessionId}/exercises/${seId}/sets/${setGroupId}`
             )
             setSession(res.data)
+            return res.data
         } catch (err) {
             console.error('Failed to delete set', err)
+            setToast({
+                message: 'Failed to remove set. Check your connection and try again.',
+                type: 'error'
+            })
         }
     }
 
@@ -150,7 +164,7 @@ export default function StartWorkout() {
                 }))
                 try {
                     const perfRes = await api.get(
-                        `/api/workout-sessions/exercises/${exerciseId}/last-performance`
+                        `/api/exercise-performance/${exerciseId}/last`
                     )
                     if (perfRes.status === 200 && perfRes.data) {
                         setLastPerformances(prev => ({
@@ -158,13 +172,19 @@ export default function StartWorkout() {
                             [exerciseId]: perfRes.data
                         }))
                     }
-                } catch (_) {}
+                } catch (err) {
+                    console.error('Failed to fetch last performance', err)
+                }
             }
             setSession(res.data)
             setShowAddExercise(false)
             setShowReplaceFor(null)
         } catch (err) {
             console.error('Failed to add exercise', err)
+            setToast({
+                message: 'Failed to add exercise. Try again.',
+                type: 'error'
+            })
         }
     }
 
@@ -175,6 +195,10 @@ export default function StartWorkout() {
             navigate('/history')
         } catch (err) {
             console.error(err)
+            setToast({
+                message: 'Failed to save workout. Try again.',
+                type: 'error'
+            })
         } finally {
             setFinishing(false)
         }
@@ -209,6 +233,10 @@ export default function StartWorkout() {
             navigate('/history')
         } catch (err) {
             console.error('Auto-finish failed', err)
+            setToast({
+                message: 'Failed to auto-fill and finish. Try again.',
+                type: 'error'
+            })
         } finally {
             setFinishing(false)
         }
@@ -247,6 +275,26 @@ export default function StartWorkout() {
         return (
             <div className="min-h-screen bg-gray-950 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        )
+    }
+
+    if (loadError || !session) {
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+                <div className="text-center">
+                    <p className="text-4xl mb-3">⚠️</p>
+                    <p className="text-white font-semibold mb-1">Couldn't load this workout</p>
+                    <p className="text-gray-500 text-sm mb-5">
+                        It may not exist or you may not have access to it.
+                    </p>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="bg-orange-500 active:bg-orange-600 text-white font-medium px-6 py-3 rounded-xl transition-colors"
+                    >
+                        Back to Dashboard
+                    </button>
+                </div>
             </div>
         )
     }
@@ -342,9 +390,15 @@ export default function StartWorkout() {
                                     </button>
                                     <button
                                         onClick={() => setShowFinishModal(false)}
-                                        className="w-full text-gray-600 text-sm py-3"
+                                        className="w-full text-gray-500 text-sm py-3"
                                     >
                                         Keep going
+                                    </button>
+                                    <button
+                                        onClick={handleDiscard}
+                                        className="w-full text-red-400/70 text-sm py-2"
+                                    >
+                                        Discard workout
                                     </button>
                                 </div>
                             </>

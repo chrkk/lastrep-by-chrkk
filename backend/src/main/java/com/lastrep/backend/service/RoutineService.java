@@ -1,12 +1,14 @@
 package com.lastrep.backend.service;
-
+import org.springframework.transaction.annotation.Transactional;
 import com.lastrep.backend.dto.*;
 import com.lastrep.backend.model.*;
 import com.lastrep.backend.repository.*;
 import org.springframework.stereotype.Service;
-
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.stream.Collectors;
+
 
 @Service
 public class RoutineService {
@@ -14,15 +16,18 @@ public class RoutineService {
     private final RoutineRepository routineRepository;
     private final RoutineExerciseRepository routineExerciseRepository;
     private final ExerciseRepository exerciseRepository;
+    private final WorkoutSessionRepository workoutSessionRepository;
     private final UserService userService;
 
     public RoutineService(RoutineRepository routineRepository,
                           RoutineExerciseRepository routineExerciseRepository,
                           ExerciseRepository exerciseRepository,
+                          WorkoutSessionRepository workoutSessionRepository,
                           UserService userService) {
         this.routineRepository = routineRepository;
         this.routineExerciseRepository = routineExerciseRepository;
         this.exerciseRepository = exerciseRepository;
+        this.workoutSessionRepository = workoutSessionRepository;
         this.userService = userService;
     }
 
@@ -68,10 +73,18 @@ public class RoutineService {
         return new RoutineResponse(routineRepository.save(routine));
     }
 
+    @Transactional
     public void deleteRoutine(Long id) {
         User user = userService.getCurrentUser();
         Routine routine = routineRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new RuntimeException("Routine not found"));
+
+        List<WorkoutSession> sessions = workoutSessionRepository.findByRoutineId(id);
+        for (WorkoutSession session : sessions) {
+            session.setRoutine(null);
+        }
+        workoutSessionRepository.saveAll(sessions);
+
         routineRepository.delete(routine);
     }
 
@@ -96,6 +109,64 @@ public class RoutineService {
 
         routine.getRoutineExercises().add(re);
         return new RoutineResponse(routineRepository.save(routine));
+    }
+
+    @Transactional
+    public RoutineResponse reorderExercises(Long routineId, List<Long> routineExerciseIds) {
+        User user = userService.getCurrentUser();
+        Routine routine = routineRepository.findByIdAndUserId(routineId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Routine not found"));
+
+        Map<Long, RoutineExercise> byId = routine.getRoutineExercises().stream()
+                .collect(Collectors.toMap(RoutineExercise::getId, re -> re));
+
+        int index = 0;
+        for (Long reId : routineExerciseIds) {
+            RoutineExercise re = byId.get(reId);
+            if (re == null) {
+                throw new RuntimeException("Routine exercise not found: " + reId);
+            }
+            re.setOrderIndex(index++);
+        }
+
+        return new RoutineResponse(routineRepository.save(routine));
+    }
+
+    @Transactional
+    public RoutineResponse duplicateRoutine(Long routineId) {
+        User user = userService.getCurrentUser();
+        Routine original = routineRepository.findByIdAndUserId(routineId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Routine not found"));
+
+        Routine copy = new Routine();
+        copy.setUser(user);
+        copy.setName(original.getName() + " (Copy)");
+        copy.setDescription(original.getDescription());
+
+        int maxOrder = routineRepository.findByUserIdOrderByRoutineOrderAsc(user.getId())
+                .stream()
+                .map(Routine::getRoutineOrder)
+                .filter(o -> o != null)
+                .max(Integer::compareTo)
+                .orElse(-1);
+        copy.setRoutineOrder(maxOrder + 1);
+
+        copy = routineRepository.save(copy);
+
+        int index = 0;
+        for (RoutineExercise originalRe : original.getRoutineExercises()) {
+            RoutineExercise newRe = new RoutineExercise();
+            newRe.setRoutine(copy);
+            newRe.setExercise(originalRe.getExercise());
+            newRe.setOrderIndex(index++);
+            newRe.setTargetSets(originalRe.getTargetSets());
+            newRe.setTargetMinReps(originalRe.getTargetMinReps());
+            newRe.setTargetMaxReps(originalRe.getTargetMaxReps());
+            newRe.setRestSeconds(originalRe.getRestSeconds());
+            copy.getRoutineExercises().add(newRe);
+        }
+
+        return new RoutineResponse(routineRepository.save(copy));
     }
 
     public void removeExercise(Long routineId, Long routineExerciseId) {

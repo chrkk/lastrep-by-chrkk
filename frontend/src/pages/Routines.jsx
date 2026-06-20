@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import Navbar from '../components/Navbar'
+import Toast from '../components/Toast'
 
 export default function Routines() {
     const navigate = useNavigate()
@@ -12,6 +13,10 @@ export default function Routines() {
     const [form, setForm] = useState({ name: '', description: '' })
     const [error, setError] = useState('')
     const [saving, setSaving] = useState(false)
+    const [deleteTarget, setDeleteTarget] = useState(null)
+    const [deleting, setDeleting] = useState(false)
+    const [duplicating, setDuplicating] = useState(null)
+    const [toast, setToast] = useState(null)
 
     useEffect(() => {
         fetchRoutines()
@@ -82,26 +87,53 @@ export default function Routines() {
         }
     }
 
-    async function handleDelete(id, e) {
+    async function handleDuplicate(routine, e) {
         e.stopPropagation()
-        if (!confirm('Delete this routine?')) return
+        setDuplicating(routine.id)
         try {
-            await api.delete(`/api/routines/${id}`)
-            setRoutines(routines.filter(r => r.id !== id))
+            await api.post(`/api/routines/${routine.id}/duplicate`)
+            await fetchRoutines()
+        } catch (err) {
+            console.error('Failed to duplicate routine', err)
+            setToast({ message: 'Failed to duplicate routine. Try again.', type: 'error' })
+        } finally {
+            setDuplicating(null)
+        }
+    }
+
+    function confirmDelete(routine) {
+        setDeleteTarget(routine)
+    }
+
+    async function handleDelete() {
+        if (!deleteTarget) return
+        setDeleting(true)
+        try {
+            await api.delete(`/api/routines/${deleteTarget.id}`)
+            setRoutines(prev => prev.filter(r => r.id !== deleteTarget.id))
+            setDeleteTarget(null)
         } catch (err) {
             console.error('Failed to delete routine', err)
+            setToast({ message: 'Failed to delete routine. Try again.', type: 'error' })
+        } finally {
+            setDeleting(false)
         }
     }
 
     const DAY_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
     return (
-        <div className="min-h-screen bg-gray-950 pb-8">
+        <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
+
+            <Toast
+                message={toast?.message}
+                type={toast?.type}
+                onDismiss={() => setToast(null)}
+            />
 
             <div className="px-4 py-6">
 
-                {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Routines</h1>
@@ -114,7 +146,6 @@ export default function Routines() {
                         + Add
                     </button>
                 </div>
-
 
                 {loading ? (
                     <div className="text-gray-600 text-sm text-center py-16">
@@ -138,11 +169,10 @@ export default function Routines() {
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        {/* Day badge */}
                                         <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-orange-400 text-sm font-bold">
-                        {DAY_LABELS[index] || index + 1}
-                      </span>
+                                            <span className="text-orange-400 text-sm font-bold">
+                                                {DAY_LABELS[index] || index + 1}
+                                            </span>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-white font-medium text-sm truncate">
@@ -155,18 +185,38 @@ export default function Routines() {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex gap-1 flex-shrink-0">
+                                    <div className="flex items-center gap-1 flex-shrink-0">
                                         <button
-                                            onClick={(e) => openEditForm(routine, e)}
-                                            className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
+                                            onClick={(e) => handleDuplicate(routine, e)}
+                                            disabled={duplicating === routine.id}
+                                            title="Duplicate"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-orange-400 active:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
                                         >
-                                            Edit
+                                            {duplicating === routine.id ? (
+                                                <div className="w-3.5 h-3.5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V5a2 2 0 012-2h9a2 2 0 012 2v9a2 2 0 01-2 2h-2M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-2" />
+                                                </svg>
+                                            )}
                                         </button>
                                         <button
-                                            onClick={(e) => handleDelete(routine.id, e)}
-                                            className="text-gray-500 text-xs px-3 py-1.5 rounded-lg active:bg-gray-700 transition-colors"
+                                            onClick={(e) => openEditForm(routine, e)}
+                                            title="Edit"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-white active:bg-gray-800 rounded-lg transition-colors"
                                         >
-                                            Delete
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); confirmDelete(routine) }}
+                                            title="Delete"
+                                            className="w-9 h-9 flex items-center justify-center text-gray-500 active:text-red-400 active:bg-red-500/10 rounded-lg transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
                                         </button>
                                     </div>
                                 </div>
@@ -181,14 +231,13 @@ export default function Routines() {
                 )}
             </div>
 
-
             {showForm && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div
                         className="absolute inset-0 bg-black/70"
                         onClick={closeForm}
                     />
-                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 pb-10 z-10">
+                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
 
                         <h2 className="text-white font-semibold text-lg mb-5">
@@ -214,6 +263,7 @@ export default function Routines() {
                                     placeholder="e.g. Push Day"
                                     required
                                     autoFocus
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>
@@ -229,6 +279,7 @@ export default function Routines() {
                                     value={form.description}
                                     onChange={handleChange}
                                     placeholder="e.g. Chest, shoulders, triceps"
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>
@@ -250,6 +301,47 @@ export default function Routines() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div
+                        className="absolute inset-0 bg-black/70"
+                        onClick={() => setDeleteTarget(null)}
+                    />
+                    <div
+                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
+                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
+                    >
+                        <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
+                        <div className="text-center mb-6">
+                            <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h2 className="text-white font-bold text-lg">Delete routine?</h2>
+                            <p className="text-gray-500 text-sm mt-1">
+                                "{deleteTarget.name}" will be permanently removed
+                            </p>
+                        </div>
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="w-full bg-red-500/10 active:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold py-4 rounded-2xl transition-colors disabled:opacity-50"
+                            >
+                                {deleting ? 'Deleting...' : 'Delete Routine'}
+                            </button>
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                className="w-full bg-gray-800 active:bg-gray-700 text-gray-400 font-medium py-4 rounded-2xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
     List<Exercise> findByUserIdOrderByCreatedAtDesc(Long userId);
     Optional<Exercise> findByIdAndUserId(Long id, Long userId);
+    long countByUserId(Long userId);
 }

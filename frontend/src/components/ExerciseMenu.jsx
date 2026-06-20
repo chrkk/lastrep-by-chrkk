@@ -116,6 +116,7 @@ export default function ExerciseMenu({
                             onChange={e => setNoteInput(e.target.value)}
                             placeholder="e.g. Keep elbows tucked, pause at bottom"
                             rows={3}
+                            autoComplete="off"
                             className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 resize-none"
                         />
                         <button

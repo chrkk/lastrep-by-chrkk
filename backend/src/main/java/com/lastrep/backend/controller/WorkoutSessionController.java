@@ -71,12 +71,4 @@ public class WorkoutSessionController {
         workoutSessionService.cancelSession(sessionId);
         return ResponseEntity.noContent().build();
     }
-
-    @GetMapping("/exercises/{exerciseId}/last-performance")
-    public ResponseEntity<LastPerformanceResponse> lastPerformance(
-            @PathVariable Long exerciseId) {
-        LastPerformanceResponse res = workoutSessionService.getLastPerformance(exerciseId);
-        if (res == null) return ResponseEntity.noContent().build();
-        return ResponseEntity.ok(res);
-    }
 }

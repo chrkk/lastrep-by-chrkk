@@ -5,8 +5,10 @@ import com.lastrep.backend.dto.ExerciseResponse;
 import com.lastrep.backend.model.Exercise;
 import com.lastrep.backend.model.User;
 import com.lastrep.backend.repository.ExerciseRepository;
+import com.lastrep.backend.repository.RoutineExerciseRepository;
+import com.lastrep.backend.repository.WorkoutSessionExerciseRepository;
 import org.springframework.stereotype.Service;
-
+import com.lastrep.backend.exception.ExerciseInUseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -14,11 +16,17 @@ import java.util.stream.Collectors;
 public class ExerciseService {
 
     private final ExerciseRepository exerciseRepository;
+    private final RoutineExerciseRepository routineExerciseRepository;
+    private final WorkoutSessionExerciseRepository workoutSessionExerciseRepository;
     private final UserService userService;
 
     public ExerciseService(ExerciseRepository exerciseRepository,
+                           RoutineExerciseRepository routineExerciseRepository,
+                           WorkoutSessionExerciseRepository workoutSessionExerciseRepository,
                            UserService userService) {
         this.exerciseRepository = exerciseRepository;
+        this.routineExerciseRepository = routineExerciseRepository;
+        this.workoutSessionExerciseRepository = workoutSessionExerciseRepository;
         this.userService = userService;
     }
 
@@ -65,6 +73,23 @@ public class ExerciseService {
         User user = userService.getCurrentUser();
         Exercise exercise = exerciseRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new RuntimeException("Exercise not found"));
+
+        boolean usedInRoutine = routineExerciseRepository.existsByExerciseId(id);
+        boolean usedInWorkout = workoutSessionExerciseRepository.existsByExerciseId(id);
+
+        if (usedInRoutine && usedInWorkout) {
+            throw new ExerciseInUseException(
+                    "This exercise is used in one or more routines and has workout history. Remove it from your routines first.");
+        }
+        if (usedInRoutine) {
+            throw new ExerciseInUseException(
+                    "This exercise is used in one or more routines. Remove it from those routines first.");
+        }
+        if (usedInWorkout) {
+            throw new ExerciseInUseException(
+                    "This exercise has workout history and can't be deleted.");
+        }
+
         exerciseRepository.delete(exercise);
     }
 }

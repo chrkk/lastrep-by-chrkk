@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+
 import java.util.List;
 
 @RestController
@@ -34,6 +35,11 @@ public class RoutineController {
         return ResponseEntity.ok(routineService.createRoutine(request));
     }
 
+    @PostMapping("/{routineId}/duplicate")
+    public ResponseEntity<RoutineResponse> duplicate(@PathVariable Long routineId) {
+        return ResponseEntity.ok(routineService.duplicateRoutine(routineId));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<RoutineResponse> update(
             @PathVariable Long id,
@@ -52,6 +58,14 @@ public class RoutineController {
             @PathVariable Long routineId,
             @RequestBody RoutineExerciseRequest request) {
         return ResponseEntity.ok(routineService.addExercise(routineId, request));
+    }
+
+    @PutMapping("/{routineId}/exercises/reorder")
+    public ResponseEntity<RoutineResponse> reorderExercises(
+            @PathVariable Long routineId,
+            @RequestBody List<Long> routineExerciseIds) {
+        return ResponseEntity.ok(
+                routineService.reorderExercises(routineId, routineExerciseIds));
     }
 
     @DeleteMapping("/{routineId}/exercises/{routineExerciseId}")

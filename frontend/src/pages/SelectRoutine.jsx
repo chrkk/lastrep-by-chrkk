@@ -38,30 +38,60 @@ export default function SelectRoutine() {
 
     return (
         <div className="min-h-screen bg-gray-950">
-            <div className="px-4 pt-12 pb-8">
 
-                <button
-                    onClick={() => navigate('/')}
-                    className="text-gray-500 text-sm mb-6 flex items-center gap-1"
-                >
-                    ← Back
-                </button>
+            <div
+                className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3"
+                style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+            >
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/')}
+                        className="w-9 h-9 flex items-center justify-center text-gray-400 active:text-white active:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-white font-bold text-base">Start Workout</h1>
+                        <p className="text-gray-500 text-xs">Choose a routine to begin</p>
+                    </div>
+                </div>
+            </div>
 
-                <h1 className="text-2xl font-bold text-white mb-1">Start Workout</h1>
-                <p className="text-gray-500 text-sm mb-8">Choose a routine to begin</p>
+            <div className="px-4 py-6">
 
                 {loading ? (
-                    <div className="text-gray-600 text-sm text-center py-16">Loading...</div>
+                    <div className="space-y-3">
+                        {[1, 2, 3].map(i => (
+                            <div
+                                key={i}
+                                className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-5 animate-pulse"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-11 h-11 rounded-xl bg-gray-800 flex-shrink-0" />
+                                    <div className="flex-1 space-y-2">
+                                        <div className="h-3.5 bg-gray-800 rounded w-2/3" />
+                                        <div className="h-2.5 bg-gray-800 rounded w-1/3" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : routines.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-4xl mb-3">📋</p>
+                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7a2 2 0 012-2h2a2 2 0 012 2v10M9 17H7a2 2 0 01-2-2V9a2 2 0 012-2h2m6 10h2a2 2 0 002-2V9a2 2 0 00-2-2h-2" />
+                            </svg>
+                        </div>
                         <p className="text-gray-500 text-sm">No routines yet.</p>
                         <p className="text-gray-600 text-xs mt-1 mb-6">
                             Create a routine first before starting a workout.
                         </p>
                         <button
                             onClick={() => navigate('/routines')}
-                            className="bg-orange-500 text-white text-sm font-medium px-6 py-3 rounded-xl"
+                            className="bg-orange-500 active:bg-orange-600 text-white text-sm font-medium px-6 py-3 rounded-xl transition-colors"
                         >
                             Go to Routines
                         </button>
@@ -81,8 +111,8 @@ export default function SelectRoutine() {
                                             <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
                                         ) : (
                                             <span className="text-orange-400 font-bold">
-                        {DAY_LABELS[index] || index + 1}
-                      </span>
+                                                {DAY_LABELS[index] || index + 1}
+                                            </span>
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">

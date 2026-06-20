@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { playRestCompleteSound } from '../utils/sound'
 
 const REST_OPTIONS = [
     { label: '30s', value: 30 },
@@ -51,6 +52,7 @@ export default function SetRow({
                 setRemaining(prev => {
                     if (prev <= 1) {
                         clearInterval(intervalRef.current)
+                        playRestCompleteSound()
                         onTimerDone?.()
                         return 0
                     }
@@ -115,6 +117,7 @@ export default function SetRow({
                         onChange={e => onWeightChange(e.target.value)}
                         placeholder={lastEntry ? String(lastEntry.weight) : '0'}
                         disabled={isChecked || isLoading}
+                        autoComplete="off"
                         onTouchStart={e => e.stopPropagation()}
                         onMouseDown={e => e.stopPropagation()}
                         className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 disabled:opacity-50 min-w-0"
@@ -139,6 +142,7 @@ export default function SetRow({
                     onChange={e => onRepsChange(e.target.value)}
                     placeholder={lastEntry ? String(lastEntry.reps) : '0'}
                     disabled={isChecked || isLoading}
+                    autoComplete="off"
                     onTouchStart={e => e.stopPropagation()}
                     onMouseDown={e => e.stopPropagation()}
                     className="w-14 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 disabled:opacity-50 flex-shrink-0"

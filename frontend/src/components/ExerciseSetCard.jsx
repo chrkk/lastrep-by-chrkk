@@ -115,7 +115,8 @@ export default function ExerciseSetCard({
         setDeleting(true)
         try {
             if (row.isChecked && row.setGroupId) {
-                await onDeleteSet(se.id, row.setGroupId)
+                const res = await onDeleteSet(se.id, row.setGroupId)
+                if (!res) return
             }
             setRows(prev => prev.filter((_, i) => i !== deleteTarget))
             setActiveTimerIndex(prev => {
@@ -140,10 +141,12 @@ export default function ExerciseSetCard({
             setCheckingIndex(index)
             if (activeTimerIndex === index) setActiveTimerIndex(null)
             try {
-                await onDeleteSet(se.id, row.setGroupId)
-                setRows(prev => prev.map((r, i) =>
-                    i === index ? { ...r, isChecked: false, setGroupId: null } : r
-                ))
+                const res = await onDeleteSet(se.id, row.setGroupId)
+                if (res) {
+                    setRows(prev => prev.map((r, i) =>
+                        i === index ? { ...r, isChecked: false, setGroupId: null } : r
+                    ))
+                }
             } finally {
                 setCheckingIndex(null)
             }
@@ -165,6 +168,8 @@ export default function ExerciseSetCard({
                     reachedFailure: false,
                 }]
             })
+
+            if (!res) return
 
             const updatedSe = res?.exercises?.find(e => e.id === se.id)
             const newGroup = updatedSe?.setGroups?.[updatedSe.setGroups.length - 1]
@@ -196,6 +201,7 @@ export default function ExerciseSetCard({
 
         setCheckingAll(true)
         try {
+            let lastSuccessfulIndex = null
             for (const { r, i } of valid) {
                 const weightVal = resolveWeight(r, i)
                 const repsVal = resolveReps(r, i)
@@ -208,6 +214,9 @@ export default function ExerciseSetCard({
                         reachedFailure: false,
                     }]
                 })
+
+                if (!res) break
+
                 const updatedSe = res?.exercises?.find(e => e.id === se.id)
                 const newGroup = updatedSe?.setGroups?.[updatedSe.setGroups.length - 1]
                 setRows(prev => prev.map((row, idx) =>
@@ -215,10 +224,10 @@ export default function ExerciseSetCard({
                         ? { ...row, isChecked: true, setGroupId: newGroup?.id || null }
                         : row
                 ))
+                lastSuccessfulIndex = i
             }
-            if (!noRest && valid.length > 0) {
-                const lastValidIndex = valid[valid.length - 1].i
-                setActiveTimerIndex(lastValidIndex)
+            if (!noRest && lastSuccessfulIndex !== null) {
+                setActiveTimerIndex(lastSuccessfulIndex)
             }
         } finally {
             setCheckingAll(false)
@@ -237,6 +246,7 @@ export default function ExerciseSetCard({
                 }))
             if (entries.length === 0) return
             const res = await onLogSet(se.id, { setType, entries })
+            if (!res) return
             const updatedSe = res?.exercises?.find(e => e.id === se.id)
             if (updatedSe) {
                 setLoggedMultiGroups(
@@ -383,6 +393,7 @@ export default function ExerciseSetCard({
                                         value={drop.weight}
                                         onChange={e => updateDrop(di, 'weight', e.target.value)}
                                         placeholder="Weight"
+                                        autoComplete="off"
                                         className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 min-w-0"
                                     />
                                     <button
@@ -400,6 +411,7 @@ export default function ExerciseSetCard({
                                         value={drop.reps}
                                         onChange={e => updateDrop(di, 'reps', e.target.value)}
                                         placeholder="Reps"
+                                        autoComplete="off"
                                         className="w-14 bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:border-orange-500 flex-shrink-0"
                                     />
                                     {dropRows.length > 1 && (
