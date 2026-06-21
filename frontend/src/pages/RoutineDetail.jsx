@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
@@ -41,8 +41,35 @@ export default function RoutineDetail() {
 
     async function fetchRoutine() {
         try {
-            const res = await api.get(`/api/routines/${id}`)
-            setRoutine(res.data)
+            const { data: routineData, error: routineError } = await supabase
+                .from('routines')
+                .select('*')
+                .eq('id', id)
+                .single()
+
+            if (routineError) throw routineError
+
+            const { data: reData, error: reError } = await supabase
+                .from('routine_exercises')
+                .select('*, exercises(name, muscle_group)')
+                .eq('routine_id', id)
+                .order('order_index', { ascending: true })
+
+            if (reError) throw reError
+
+            const mappedExercises = reData.map(re => ({
+                id: re.id,
+                exerciseId: re.exercise_id,
+                exerciseName: re.exercises.name,
+                muscleGroup: re.exercises.muscle_group,
+                orderIndex: re.order_index,
+                targetSets: re.target_sets,
+                targetMinReps: re.target_min_reps,
+                targetMaxReps: re.target_max_reps,
+                restSeconds: re.rest_seconds,
+            }))
+
+            setRoutine({ ...routineData, exercises: mappedExercises })
         } catch (err) {
             console.error('Failed to fetch routine', err)
         } finally {
@@ -52,8 +79,13 @@ export default function RoutineDetail() {
 
     async function fetchExercises() {
         try {
-            const res = await api.get('/api/exercises')
-            setExercises(res.data)
+            const { data, error: fetchError } = await supabase
+                .from('exercises')
+                .select('*')
+                .order('name', { ascending: true })
+
+            if (fetchError) throw fetchError
+            setExercises(data)
         } catch (err) {
             console.error('Failed to fetch exercises', err)
         }
@@ -83,11 +115,29 @@ export default function RoutineDetail() {
         setSaving(true)
         setError('')
         try {
-            await api.post(`/api/routines/${id}/exercises`, targetForm)
+            const { data: userData } = await supabase.auth.getUser()
+            const nextIndex = routine.exercises?.length || 0
+
+            const { error: insertError } = await supabase
+                .from('routine_exercises')
+                .insert({
+                    user_id: userData.user.id,
+                    routine_id: id,
+                    exercise_id: targetForm.exerciseId,
+                    order_index: nextIndex,
+                    target_sets: targetForm.targetSets,
+                    target_min_reps: targetForm.targetMinReps,
+                    target_max_reps: targetForm.targetMaxReps,
+                    rest_seconds: targetForm.restSeconds,
+                })
+
+            if (insertError) throw insertError
+
             await fetchRoutine()
             setShowTargetForm(false)
             setSelectedExercise(null)
         } catch (err) {
+            console.error(err)
             setError('Failed to add exercise.')
         } finally {
             setSaving(false)
@@ -102,7 +152,12 @@ export default function RoutineDetail() {
         if (!removeTarget) return
         setRemoving(true)
         try {
-            await api.delete(`/api/routines/${id}/exercises/${removeTarget.id}`)
+            const { error: deleteError } = await supabase
+                .from('routine_exercises')
+                .delete()
+                .eq('id', removeTarget.id)
+
+            if (deleteError) throw deleteError
             await fetchRoutine()
         } catch (err) {
             console.error('Failed to remove exercise', err)
@@ -113,7 +168,7 @@ export default function RoutineDetail() {
         }
     }
 
-    function moveExercise(index, direction) {
+    async function moveExercise(index, direction) {
         if (reordering) return
         const newIndex = index + direction
         if (newIndex < 0 || newIndex >= routine.exercises.length) return
@@ -127,14 +182,23 @@ export default function RoutineDetail() {
         setRoutine(prev => ({ ...prev, exercises: reordered }))
         setReordering(true)
 
-        const orderedIds = reordered.map(re => re.id)
-        api.put(`/api/routines/${id}/exercises/reorder`, orderedIds)
-            .catch(err => {
-                console.error('Failed to reorder', err)
-                setRoutine(prev => ({ ...prev, exercises: previousOrder }))
-                setToast({ message: 'Failed to save order. Try again.', type: 'error' })
-            })
-            .finally(() => setReordering(false))
+        try {
+            const updates = reordered.map((re, i) =>
+                supabase
+                    .from('routine_exercises')
+                    .update({ order_index: i })
+                    .eq('id', re.id)
+            )
+            const results = await Promise.all(updates)
+            const failed = results.find(r => r.error)
+            if (failed) throw failed.error
+        } catch (err) {
+            console.error('Failed to reorder', err)
+            setRoutine(prev => ({ ...prev, exercises: previousOrder }))
+            setToast({ message: 'Failed to save order. Try again.', type: 'error' })
+        } finally {
+            setReordering(false)
+        }
     }
 
     const availableExercises = exercises.filter(
@@ -169,7 +233,10 @@ export default function RoutineDetail() {
                 onDismiss={() => setToast(null)}
             />
 
-            <div className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3">
+            <div
+                className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3"
+                style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+            >
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate('/routines')}
@@ -330,9 +397,9 @@ export default function RoutineDetail() {
                                                 {exercise.name}
                                             </p>
                                             <div className="flex gap-2 mt-1">
-                                                {exercise.muscleGroup && (
+                                                {exercise.muscle_group && (
                                                     <span className="text-xs text-orange-400">
-                                                        {exercise.muscleGroup}
+                                                        {exercise.muscle_group}
                                                     </span>
                                                 )}
                                                 {exercise.equipment && (
@@ -428,6 +495,7 @@ export default function RoutineDetail() {
                                             })}
                                             min="1"
                                             max="100"
+                                            autoComplete="off"
                                             className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm text-center focus:outline-none focus:border-orange-500"
                                         />
                                     </div>
