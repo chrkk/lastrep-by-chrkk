@@ -48,10 +48,11 @@ export default function Dashboard() {
         if (!dashboard?.suggestedRoutineId) return
         setStarting(true)
         try {
-            const res = await api.post('/api/workout-sessions/start', {
-                routineId: dashboard.suggestedRoutineId
-            })
-            navigate(`/workout/${res.data.id}`)
+            const { data, error: rpcError } = await supabase
+                .rpc('start_workout_session', { routine_id_input: dashboard.suggestedRoutineId })
+
+            if (rpcError) throw rpcError
+            navigate(`/workout/${data}`)
         } catch (err) {
             console.error('Failed to start workout', err)
         } finally {
