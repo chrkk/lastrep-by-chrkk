@@ -4,6 +4,7 @@ import api from '../api/axios'
 import ExerciseSetCard from '../components/ExerciseSetCard'
 import ExerciseMenu from '../components/ExerciseMenu'
 import Toast from '../components/Toast'
+import { supabase } from '../lib/supabase'
 
 export default function StartWorkout() {
     const { sessionId } = useParams()
@@ -48,10 +49,70 @@ export default function StartWorkout() {
 
     async function fetchSession() {
         try {
-            const res = await api.get(`/api/workout-sessions/${sessionId}`)
-            setSession(res.data)
-            await fetchLastPerformances(res.data.exercises)
-            initMeta(res.data.exercises)
+            const { data: sessionData, error: sessionError } = await supabase
+                .from('workout_sessions')
+                .select('*')
+                .eq('id', sessionId)
+                .single()
+
+            if (sessionError) throw sessionError
+
+            const { data: exercisesData, error: exercisesError } = await supabase
+                .from('workout_session_exercises')
+                .select(`
+                *,
+                exercises(name, muscle_group),
+                workout_set_groups(
+                    *,
+                    workout_set_entries(*)
+                )
+            `)
+                .eq('workout_session_id', sessionId)
+                .order('order_index', { ascending: true })
+
+            if (exercisesError) throw exercisesError
+
+            const mappedExercises = exercisesData.map(se => ({
+                id: se.id,
+                exerciseId: se.exercise_id,
+                exerciseName: se.exercises.name,
+                muscleGroup: se.exercises.muscle_group,
+                orderIndex: se.order_index,
+                targetSets: se.target_sets,
+                targetMinReps: se.target_min_reps,
+                targetMaxReps: se.target_max_reps,
+                restSeconds: se.rest_seconds,
+                setGroups: (se.workout_set_groups || [])
+                    .sort((a, b) => a.set_number - b.set_number)
+                    .map(g => ({
+                        id: g.id,
+                        setNumber: g.set_number,
+                        setType: g.set_type,
+                        entries: (g.workout_set_entries || [])
+                            .sort((a, b) => a.entry_number - b.entry_number)
+                            .map(e => ({
+                                id: e.id,
+                                weight: e.weight,
+                                weightUnit: e.weight_unit,
+                                reps: e.reps,
+                                reachedFailure: e.reached_failure,
+                            }))
+                    }))
+            }))
+
+            const fullSession = {
+                id: sessionData.id,
+                routineId: sessionData.routine_id,
+                routineName: sessionData.routine_name_snapshot,
+                status: sessionData.status,
+                createdAt: sessionData.created_at,
+                finishedAt: sessionData.finished_at,
+                exercises: mappedExercises,
+            }
+
+            setSession(fullSession)
+            await fetchLastPerformances(mappedExercises)
+            initMeta(mappedExercises)
         } catch (err) {
             console.error('Failed to fetch session', err)
             setLoadError(true)
@@ -74,11 +135,47 @@ export default function StartWorkout() {
         await Promise.all(
             sessionExercises.map(async se => {
                 try {
-                    const res = await api.get(
-                        `/api/exercise-performance/${se.exerciseId}/last`
-                    )
-                    if (res.status === 200 && res.data) {
-                        performances[se.exerciseId] = res.data
+                    const { data, error: perfError } = await supabase
+                        .from('workout_session_exercises')
+                        .select(`
+                        exercise_id,
+                        exercises(name),
+                        workout_session_id,
+                        workout_sessions!inner(id, created_at, status),
+                        workout_set_groups(
+                            *,
+                            workout_set_entries(*)
+                        )
+                    `)
+                        .eq('exercise_id', se.exerciseId)
+                        .eq('workout_sessions.status', 'COMPLETED')
+                        .neq('workout_session_id', sessionId)
+                        .order('workout_sessions(created_at)', { ascending: false })
+                        .limit(1)
+
+                    if (perfError || !data || data.length === 0) return
+
+                    const last = data[0]
+                    if (!last.workout_set_groups || last.workout_set_groups.length === 0) return
+
+                    performances[se.exerciseId] = {
+                        exerciseId: se.exerciseId,
+                        exerciseName: last.exercises.name,
+                        date: last.workout_sessions.created_at,
+                        setGroups: last.workout_set_groups
+                            .sort((a, b) => a.set_number - b.set_number)
+                            .map(g => ({
+                                id: g.id,
+                                setNumber: g.set_number,
+                                setType: g.set_type,
+                                entries: (g.workout_set_entries || [])
+                                    .sort((a, b) => a.entry_number - b.entry_number)
+                                    .map(e => ({
+                                        weight: e.weight,
+                                        weightUnit: e.weight_unit,
+                                        reps: e.reps,
+                                    }))
+                            }))
                     }
                 } catch (_) {}
             })
