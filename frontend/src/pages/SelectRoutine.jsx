@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import api from '../api/axios'
 
 export default function SelectRoutine() {
@@ -14,8 +15,19 @@ export default function SelectRoutine() {
 
     async function fetchRoutines() {
         try {
-            const res = await api.get('/api/routines')
-            setRoutines(res.data)
+            const { data: routinesData, error: routinesError } = await supabase
+                .from('routines')
+                .select('*, routine_exercises(id)')
+                .order('routine_order', { ascending: true })
+
+            if (routinesError) throw routinesError
+
+            const withCounts = routinesData.map(r => ({
+                ...r,
+                exercises: r.routine_exercises
+            }))
+
+            setRoutines(withCounts)
         } catch (err) {
             console.error('Failed to fetch routines', err)
         } finally {
@@ -26,8 +38,11 @@ export default function SelectRoutine() {
     async function handleSelect(routineId) {
         setStarting(routineId)
         try {
-            const res = await api.post('/api/workout-sessions/start', { routineId })
-            navigate(`/workout/${res.data.id}`)
+            const { data, error: rpcError } = await supabase
+                .rpc('start_workout_session', { routine_id_input: routineId })
+
+            if (rpcError) throw rpcError
+            navigate(`/workout/${data}`)
         } catch (err) {
             console.error('Failed to start session', err)
             setStarting(null)
