@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
@@ -33,8 +33,19 @@ export default function Routines() {
 
     async function fetchRoutines() {
         try {
-            const res = await api.get('/api/routines')
-            setRoutines(res.data)
+            const { data: routinesData, error: routinesError } = await supabase
+                .from('routines')
+                .select('*, routine_exercises(id)')
+                .order('routine_order', { ascending: true })
+
+            if (routinesError) throw routinesError
+
+            const withCounts = routinesData.map(r => ({
+                ...r,
+                exercises: r.routine_exercises
+            }))
+
+            setRoutines(withCounts)
         } catch (err) {
             console.error('Failed to fetch routines', err)
         } finally {
@@ -74,13 +85,40 @@ export default function Routines() {
         setSaving(true)
         try {
             if (editingRoutine) {
-                await api.put(`/api/routines/${editingRoutine.id}`, form)
+                const { error: updateError } = await supabase
+                    .from('routines')
+                    .update({ name: form.name, description: form.description || null })
+                    .eq('id', editingRoutine.id)
+
+                if (updateError) throw updateError
             } else {
-                await api.post('/api/routines', form)
+                const { data: userData } = await supabase.auth.getUser()
+
+                const { data: existing, error: countError } = await supabase
+                    .from('routines')
+                    .select('routine_order')
+                    .order('routine_order', { ascending: false })
+                    .limit(1)
+
+                if (countError) throw countError
+
+                const nextOrder = existing.length > 0 ? existing[0].routine_order + 1 : 0
+
+                const { error: insertError } = await supabase
+                    .from('routines')
+                    .insert({
+                        user_id: userData.user.id,
+                        name: form.name,
+                        description: form.description || null,
+                        routine_order: nextOrder,
+                    })
+
+                if (insertError) throw insertError
             }
             await fetchRoutines()
             closeForm()
         } catch (err) {
+            console.error(err)
             setError('Failed to save routine. Please try again.')
         } finally {
             setSaving(false)
@@ -91,7 +129,10 @@ export default function Routines() {
         e.stopPropagation()
         setDuplicating(routine.id)
         try {
-            await api.post(`/api/routines/${routine.id}/duplicate`)
+            const { error: rpcError } = await supabase
+                .rpc('duplicate_routine', { routine_id_input: routine.id })
+
+            if (rpcError) throw rpcError
             await fetchRoutines()
         } catch (err) {
             console.error('Failed to duplicate routine', err)
@@ -109,7 +150,13 @@ export default function Routines() {
         if (!deleteTarget) return
         setDeleting(true)
         try {
-            await api.delete(`/api/routines/${deleteTarget.id}`)
+            const { error: deleteError } = await supabase
+                .from('routines')
+                .delete()
+                .eq('id', deleteTarget.id)
+
+            if (deleteError) throw deleteError
+
             setRoutines(prev => prev.filter(r => r.id !== deleteTarget.id))
             setDeleteTarget(null)
         } catch (err) {
