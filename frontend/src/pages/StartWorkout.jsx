@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 import ExerciseSetCard from '../components/ExerciseSetCard'
 import ExerciseMenu from '../components/ExerciseMenu'
 import Toast from '../components/Toast'
-import { supabase } from '../lib/supabase'
 
 export default function StartWorkout() {
     const { sessionId } = useParams()
@@ -123,10 +122,15 @@ export default function StartWorkout() {
 
     async function fetchAllExercises() {
         try {
-            const res = await api.get('/api/exercises')
-            setAllExercises(res.data)
+            const { data, error: fetchError } = await supabase
+                .from('exercises')
+                .select('*')
+                .order('name', { ascending: true })
+
+            if (fetchError) throw fetchError
+            setAllExercises(data)
         } catch (err) {
-            console.error(err)
+            console.error('Failed to fetch exercises', err)
         }
     }
 
@@ -195,6 +199,68 @@ export default function StartWorkout() {
         setExerciseMeta(meta)
     }
 
+    async function refetchSession() {
+        const { data: sessionData } = await supabase
+            .from('workout_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single()
+
+        const { data: exercisesData } = await supabase
+            .from('workout_session_exercises')
+            .select(`
+            *,
+            exercises(name, muscle_group),
+            workout_set_groups(
+                *,
+                workout_set_entries(*)
+            )
+        `)
+            .eq('workout_session_id', sessionId)
+            .order('order_index', { ascending: true })
+
+        const mappedExercises = (exercisesData || []).map(se => ({
+            id: se.id,
+            exerciseId: se.exercise_id,
+            exerciseName: se.exercises.name,
+            muscleGroup: se.exercises.muscle_group,
+            orderIndex: se.order_index,
+            targetSets: se.target_sets,
+            targetMinReps: se.target_min_reps,
+            targetMaxReps: se.target_max_reps,
+            restSeconds: se.rest_seconds,
+            setGroups: (se.workout_set_groups || [])
+                .sort((a, b) => a.set_number - b.set_number)
+                .map(g => ({
+                    id: g.id,
+                    setNumber: g.set_number,
+                    setType: g.set_type,
+                    entries: (g.workout_set_entries || [])
+                        .sort((a, b) => a.entry_number - b.entry_number)
+                        .map(e => ({
+                            id: e.id,
+                            weight: e.weight,
+                            weightUnit: e.weight_unit,
+                            reps: e.reps,
+                            reachedFailure: e.reached_failure,
+                        }))
+                }))
+        }))
+
+        const updatedSession = {
+            id: sessionData.id,
+            routineId: sessionData.routine_id,
+            routineName: sessionData.routine_name_snapshot,
+            status: sessionData.status,
+            createdAt: sessionData.created_at,
+            finishedAt: sessionData.finished_at,
+            exercises: mappedExercises,
+        }
+
+        setSession(updatedSession)
+        return updatedSession
+    }
+
     function formatTime(seconds) {
         const h = Math.floor(seconds / 3600)
         const m = Math.floor((seconds % 3600) / 60)
@@ -216,12 +282,43 @@ export default function StartWorkout() {
 
     async function handleLogSet(seId, payload) {
         try {
-            const res = await api.post(
-                `/api/workout-sessions/${sessionId}/exercises/${seId}/sets`,
-                payload
-            )
-            setSession(res.data)
-            return res.data
+            const { data: userData } = await supabase.auth.getUser()
+            const userId = userData.user.id
+
+            const currentSe = session.exercises.find(e => e.id === seId)
+            const nextSetNumber = (currentSe?.setGroups?.length || 0) + 1
+
+            const { data: groupData, error: groupError } = await supabase
+                .from('workout_set_groups')
+                .insert({
+                    user_id: userId,
+                    session_exercise_id: seId,
+                    set_number: nextSetNumber,
+                    set_type: payload.setType || 'NORMAL',
+                })
+                .select()
+                .single()
+
+            if (groupError) throw groupError
+
+            const entries = payload.entries.map((entry, i) => ({
+                user_id: userId,
+                set_group_id: groupData.id,
+                entry_number: i + 1,
+                weight: entry.weight,
+                weight_unit: entry.weightUnit,
+                reps: entry.reps,
+                reached_failure: entry.reachedFailure || false,
+            }))
+
+            const { error: entriesError } = await supabase
+                .from('workout_set_entries')
+                .insert(entries)
+
+            if (entriesError) throw entriesError
+
+            const updatedSession = await refetchSession()
+            return updatedSession
         } catch (err) {
             console.error('Failed to log set', err)
             setToast({
@@ -233,11 +330,15 @@ export default function StartWorkout() {
 
     async function handleDeleteSet(seId, setGroupId) {
         try {
-            const res = await api.delete(
-                `/api/workout-sessions/${sessionId}/exercises/${seId}/sets/${setGroupId}`
-            )
-            setSession(res.data)
-            return res.data
+            const { error: deleteError } = await supabase
+                .from('workout_set_groups')
+                .delete()
+                .eq('id', setGroupId)
+
+            if (deleteError) throw deleteError
+
+            const updatedSession = await refetchSession()
+            return updatedSession
         } catch (err) {
             console.error('Failed to delete set', err)
             setToast({
@@ -249,31 +350,91 @@ export default function StartWorkout() {
 
     async function handleAddExercise(exerciseId) {
         try {
-            const res = await api.post(
-                `/api/workout-sessions/${sessionId}/exercises`,
-                { exerciseId }
-            )
-            const newSe = res.data.exercises.find(e => e.exerciseId === exerciseId)
-            if (newSe) {
-                setExerciseMeta(prev => ({
-                    ...prev,
-                    [newSe.id]: { note: '', restDuration: 90, defaultUnit: 'KG' }
-                }))
-                try {
-                    const perfRes = await api.get(
-                        `/api/exercise-performance/${exerciseId}/last`
-                    )
-                    if (perfRes.status === 200 && perfRes.data) {
+            const { data: userData } = await supabase.auth.getUser()
+            const userId = userData.user.id
+
+            const nextIndex = session.exercises.length
+
+            const { data: seData, error: insertError } = await supabase
+                .from('workout_session_exercises')
+                .insert({
+                    user_id: userId,
+                    workout_session_id: sessionId,
+                    exercise_id: exerciseId,
+                    order_index: nextIndex,
+                    rest_seconds: 90,
+                })
+                .select('*, exercises(name, muscle_group)')
+                .single()
+
+            if (insertError) throw insertError
+
+            const newSe = {
+                id: seData.id,
+                exerciseId: seData.exercise_id,
+                exerciseName: seData.exercises.name,
+                muscleGroup: seData.exercises.muscle_group,
+                orderIndex: seData.order_index,
+                targetSets: null,
+                targetMinReps: null,
+                targetMaxReps: null,
+                restSeconds: seData.rest_seconds,
+                setGroups: [],
+            }
+
+            setExerciseMeta(prev => ({
+                ...prev,
+                [newSe.id]: { note: '', restDuration: 90, defaultUnit: 'KG' }
+            }))
+
+            try {
+                const { data: perfData } = await supabase
+                    .from('workout_session_exercises')
+                    .select(`
+                    exercise_id,
+                    exercises(name),
+                    workout_session_id,
+                    workout_sessions!inner(id, created_at, status),
+                    workout_set_groups(*, workout_set_entries(*))
+                `)
+                    .eq('exercise_id', exerciseId)
+                    .eq('workout_sessions.status', 'COMPLETED')
+                    .neq('workout_session_id', sessionId)
+                    .order('workout_sessions(created_at)', { ascending: false })
+                    .limit(1)
+
+                if (perfData && perfData.length > 0) {
+                    const last = perfData[0]
+                    if (last.workout_set_groups?.length > 0) {
                         setLastPerformances(prev => ({
                             ...prev,
-                            [exerciseId]: perfRes.data
+                            [exerciseId]: {
+                                exerciseId,
+                                setGroups: last.workout_set_groups
+                                    .sort((a, b) => a.set_number - b.set_number)
+                                    .map(g => ({
+                                        id: g.id,
+                                        setNumber: g.set_number,
+                                        setType: g.set_type,
+                                        entries: (g.workout_set_entries || [])
+                                            .sort((a, b) => a.entry_number - b.entry_number)
+                                            .map(e => ({
+                                                weight: e.weight,
+                                                weightUnit: e.weight_unit,
+                                                reps: e.reps,
+                                            }))
+                                    }))
+                            }
                         }))
                     }
-                } catch (err) {
-                    console.error('Failed to fetch last performance', err)
                 }
-            }
-            setSession(res.data)
+            } catch (_) {}
+
+            setSession(prev => ({
+                ...prev,
+                exercises: [...prev.exercises, newSe]
+            }))
+
             setShowAddExercise(false)
             setShowReplaceFor(null)
         } catch (err) {
@@ -288,7 +449,15 @@ export default function StartWorkout() {
     async function handleFinish() {
         setFinishing(true)
         try {
-            await api.post(`/api/workout-sessions/${sessionId}/finish`)
+            const { error: finishError } = await supabase
+                .from('workout_sessions')
+                .update({
+                    status: 'COMPLETED',
+                    finished_at: new Date().toISOString(),
+                })
+                .eq('id', sessionId)
+
+            if (finishError) throw finishError
             navigate('/history')
         } catch (err) {
             console.error(err)
@@ -304,29 +473,59 @@ export default function StartWorkout() {
     async function handleAutoFinish() {
         setFinishing(true)
         try {
+            const { data: userData } = await supabase.auth.getUser()
+            const userId = userData.user.id
+
             for (const se of session.exercises) {
                 const target = se.targetSets || 3
                 const logged = se.setGroups?.length || 0
                 if (logged >= target) continue
                 const lastPerf = lastPerformances[se.exerciseId]
+
                 for (let i = logged; i < target; i++) {
                     const lastEntry = lastPerf?.setGroups?.[i]?.entries?.[0]
                     if (!lastEntry) continue
-                    await api.post(
-                        `/api/workout-sessions/${sessionId}/exercises/${se.id}/sets`,
-                        {
-                            setType: 'NORMAL',
-                            entries: [{
-                                weight: lastEntry.weight,
-                                weightUnit: lastEntry.weightUnit,
-                                reps: lastEntry.reps,
-                                reachedFailure: false,
-                            }]
-                        }
-                    )
+
+                    const nextSetNumber = i + 1
+
+                    const { data: groupData, error: groupError } = await supabase
+                        .from('workout_set_groups')
+                        .insert({
+                            user_id: userId,
+                            session_exercise_id: se.id,
+                            set_number: nextSetNumber,
+                            set_type: 'NORMAL',
+                        })
+                        .select()
+                        .single()
+
+                    if (groupError) throw groupError
+
+                    const { error: entryError } = await supabase
+                        .from('workout_set_entries')
+                        .insert({
+                            user_id: userId,
+                            set_group_id: groupData.id,
+                            entry_number: 1,
+                            weight: lastEntry.weight,
+                            weight_unit: lastEntry.weightUnit,
+                            reps: lastEntry.reps,
+                            reached_failure: false,
+                        })
+
+                    if (entryError) throw entryError
                 }
             }
-            await api.post(`/api/workout-sessions/${sessionId}/finish`)
+
+            const { error: finishError } = await supabase
+                .from('workout_sessions')
+                .update({
+                    status: 'COMPLETED',
+                    finished_at: new Date().toISOString(),
+                })
+                .eq('id', sessionId)
+
+            if (finishError) throw finishError
             navigate('/history')
         } catch (err) {
             console.error('Auto-finish failed', err)
@@ -341,7 +540,10 @@ export default function StartWorkout() {
 
     async function handleDiscard() {
         try {
-            await api.post(`/api/workout-sessions/${sessionId}/cancel`)
+            await supabase
+                .from('workout_sessions')
+                .update({ status: 'CANCELLED' })
+                .eq('id', sessionId)
         } catch (_) {}
         navigate('/')
     }
