@@ -10,6 +10,7 @@ export default function RoutineDetail() {
 
     const [routine, setRoutine] = useState(null)
     const [exercises, setExercises] = useState([])
+    const [starting, setStarting] = useState(false)
     const [loading, setLoading] = useState(true)
     const [showAddExercise, setShowAddExercise] = useState(false)
     const [showTargetForm, setShowTargetForm] = useState(false)
@@ -74,6 +75,22 @@ export default function RoutineDetail() {
             console.error('Failed to fetch routine', err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function handleStartWorkout() {
+        setStarting(true)
+        try {
+            const { data, error: rpcError } = await supabase
+                .rpc('start_workout_session', { routine_id_input: parseInt(id) })
+
+            if (rpcError) throw rpcError
+            navigate(`/workout/${data}`)
+        } catch (err) {
+            console.error('Failed to start workout', err)
+            setToast({ message: 'Failed to start workout. Try again.', type: 'error' })
+        } finally {
+            setStarting(false)
         }
     }
 
@@ -265,13 +282,20 @@ export default function RoutineDetail() {
 
                 {routine.exercises?.length > 0 && (
                     <button
-                        onClick={() => navigate(`/workout/new?routineId=${routine.id}`)}
-                        className="w-full bg-orange-500 active:bg-orange-600 text-white font-semibold py-4 rounded-2xl text-sm mb-6 transition-colors flex items-center justify-center gap-2"
+                        onClick={handleStartWorkout}
+                        disabled={starting}
+                        className="w-full bg-orange-500 active:bg-orange-600 disabled:opacity-50 text-white font-semibold py-4 rounded-2xl text-sm mb-6 transition-colors flex items-center justify-center gap-2"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
-                        </svg>
-                        Start Workout
+                        {starting ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                                </svg>
+                                Start Workout
+                            </>
+                        )}
                     </button>
                 )}
 
