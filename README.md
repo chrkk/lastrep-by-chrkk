@@ -6,14 +6,18 @@ A full-stack workout tracker that remembers your previous sets, reps, and weight
 
 ## Tech Stack
 - **Frontend:** React + Vite + Tailwind CSS
-- **Backend:** Spring Boot + Spring Data JPA
-- **Database:** PostgreSQL
-- **Auth:** JWT
-- **Deployment:** Vercel (frontend) + Render (backend)
+- **Backend:** Supabase (PostgreSQL, Auth, RPC)
+- **Deployment:** Vercel (frontend)
 
 ## Project Structure
 ```
 lastrep-by-chrkk/
-├── frontend/   # React + Vite app
-└── backend/    # Spring Boot API
+└── frontend/   # React + Vite app (Supabase client)
+```
+
+## Environment Variables
+Create `frontend/.env.local` with:
+```
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
