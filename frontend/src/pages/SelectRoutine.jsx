@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import api from '../api/axios'
 
 export default function SelectRoutine() {
     const navigate = useNavigate()
