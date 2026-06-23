@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 
 function formatDate(dateStr) {
@@ -26,28 +26,49 @@ export default function ExerciseHistory() {
 
     async function fetchHistory() {
         try {
-            const sessionsRes = await api.get('/api/workout-sessions')
-            const completed = sessionsRes.data.filter(s => s.status === 'COMPLETED')
+            const { data, error: fetchError } = await supabase
+                .from('workout_session_exercises')
+                .select(`
+                    *,
+                    exercises(name),
+                    workout_sessions!inner(id, created_at, status, routine_name_snapshot),
+                    workout_set_groups(*, workout_set_entries(*))
+                `)
+                .eq('exercise_id', id)
+                .eq('workout_sessions.status', 'COMPLETED')
+                .order('workout_sessions(created_at)', { ascending: false })
 
-            const exerciseId = parseInt(id)
-            const relevant = []
+            if (fetchError) throw fetchError
 
-            for (const session of completed) {
-                const se = session.exercises?.find(
-                    e => e.exerciseId === exerciseId
-                )
-                if (se && se.setGroups?.length > 0) {
-                    if (!exerciseName) setExerciseName(se.exerciseName)
-                    relevant.push({
-                        sessionId: session.id,
-                        date: session.createdAt,
-                        routineName: session.routineName,
-                        setGroups: se.setGroups,
-                    })
-                }
+            const relevant = data.filter(
+                se => se.workout_set_groups && se.workout_set_groups.length > 0
+            )
+
+            if (relevant.length > 0) {
+                setExerciseName(relevant[0].exercises.name)
             }
 
-            setHistory(relevant)
+            const mapped = relevant.map(se => ({
+                sessionId: se.workout_session_id,
+                date: se.workout_sessions.created_at,
+                routineName: se.workout_sessions.routine_name_snapshot || 'Custom',
+                setGroups: (se.workout_set_groups || [])
+                    .sort((a, b) => a.set_number - b.set_number)
+                    .map(g => ({
+                        id: g.id,
+                        setNumber: g.set_number,
+                        setType: g.set_type,
+                        entries: (g.workout_set_entries || [])
+                            .sort((a, b) => a.entry_number - b.entry_number)
+                            .map(e => ({
+                                weight: e.weight,
+                                weightUnit: e.weight_unit,
+                                reps: e.reps,
+                            }))
+                    }))
+            }))
+
+            setHistory(mapped)
         } catch (err) {
             console.error('Failed to fetch exercise history', err)
         } finally {
@@ -59,9 +80,7 @@ export default function ExerciseHistory() {
         let best = null
         for (const group of setGroups) {
             for (const entry of group.entries) {
-                if (!best || entry.weight > best.weight) {
-                    best = entry
-                }
+                if (!best || entry.weight > best.weight) best = entry
             }
         }
         return best
@@ -71,16 +90,14 @@ export default function ExerciseHistory() {
         let total = 0
         for (const group of setGroups) {
             for (const entry of group.entries) {
-                if (entry.weight && entry.reps) {
-                    total += entry.weight * entry.reps
-                }
+                if (entry.weight && entry.reps) total += entry.weight * entry.reps
             }
         }
         return Math.round(total)
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 pb-24">
+        <div className="min-h-screen bg-gray-950 pb-8">
             <Navbar />
             <div className="px-4 py-6">
 
@@ -101,12 +118,14 @@ export default function ExerciseHistory() {
                 </div>
 
                 {loading ? (
-                    <div className="text-gray-600 text-sm text-center py-16">
-                        Loading...
-                    </div>
+                    <div className="text-gray-600 text-sm text-center py-16">Loading...</div>
                 ) : history.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-4xl mb-3">📈</p>
+                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
+                            </svg>
+                        </div>
                         <p className="text-gray-500 text-sm">No history yet.</p>
                         <p className="text-gray-600 text-xs mt-1">
                             Log this exercise in a workout to see progress here.
@@ -127,7 +146,7 @@ export default function ExerciseHistory() {
                                                 {formatDate(entry.date)}
                                             </p>
                                             <p className="text-gray-500 text-xs mt-0.5">
-                                                {entry.routineName || 'Custom'}
+                                                {entry.routineName}
                                             </p>
                                         </div>
                                         {index === 0 && (

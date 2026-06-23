@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 const TABS = [
     {
@@ -42,10 +43,8 @@ const TABS = [
 export default function Navbar() {
     const navigate = useNavigate()
 
-    function handleLogout() {
-        localStorage.removeItem('token')
-        localStorage.removeItem('username')
-        localStorage.removeItem('name')
+    async function handleLogout() {
+        await supabase.auth.signOut()
         navigate('/login')
     }
 

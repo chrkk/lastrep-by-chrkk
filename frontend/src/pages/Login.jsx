@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
     const navigate = useNavigate()
-    const [form, setForm] = useState({ username: '', password: '', rememberMe: false })
+    const [form, setForm] = useState({ email: '', password: '' })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -16,8 +16,7 @@ export default function Login() {
     }, [])
 
     function handleChange(e) {
-        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
-        setForm({ ...form, [e.target.name]: value })
+        setForm({ ...form, [e.target.name]: e.target.value })
     }
 
     async function handleSubmit(e) {
@@ -25,13 +24,23 @@ export default function Login() {
         setError('')
         setLoading(true)
         try {
-            const res = await api.post('/api/auth/login', form)
-            localStorage.setItem('token', res.data.token)
-            localStorage.setItem('username', res.data.username)
-            localStorage.setItem('name', res.data.name)
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                email: form.email,
+                password: form.password,
+            })
+
+            if (signInError) {
+                if (signInError.message.toLowerCase().includes('email not confirmed')) {
+                    setError('Please confirm your email before logging in. Check your inbox.')
+                } else {
+                    setError('Invalid email or password.')
+                }
+                return
+            }
+
             navigate('/')
         } catch (err) {
-            setError(err.response?.data?.message || 'Invalid username or password.')
+            setError('Login failed. Please try again.')
         } finally {
             setLoading(false)
         }
@@ -57,14 +66,15 @@ export default function Login() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-gray-400 text-sm mb-1.5">Username</label>
+                            <label className="block text-gray-400 text-sm mb-1.5">Email</label>
                             <input
-                                type="text"
-                                name="username"
-                                value={form.username}
+                                type="email"
+                                name="email"
+                                value={form.email}
                                 onChange={handleChange}
-                                placeholder="Enter Username"
+                                placeholder="Enter your email"
                                 required
+                                autoComplete="off"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
@@ -78,20 +88,10 @@ export default function Login() {
                                 onChange={handleChange}
                                 placeholder="Enter Password"
                                 required
+                                autoComplete="off"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                             />
                         </div>
-
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                name="rememberMe"
-                                checked={form.rememberMe}
-                                onChange={handleChange}
-                                className="w-4 h-4 rounded accent-orange-500"
-                            />
-                            <span className="text-gray-400 text-sm">Stay logged in for 30 days</span>
-                        </label>
 
                         <button
                             type="submit"

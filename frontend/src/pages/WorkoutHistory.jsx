@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../api/axios'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 
 function formatDuration(seconds) {
@@ -44,9 +44,55 @@ export default function WorkoutHistory() {
 
     async function fetchSessions() {
         try {
-            const res = await api.get('/api/workout-sessions')
-            const completed = res.data.filter(s => s.status === 'COMPLETED')
-            setSessions(completed)
+            const { data, error: fetchError } = await supabase
+                .from('workout_sessions')
+                .select(`
+                    *,
+                    workout_session_exercises(
+                        *,
+                        exercises(name, muscle_group),
+                        workout_set_groups(
+                            *,
+                            workout_set_entries(*)
+                        )
+                    )
+                `)
+                .eq('status', 'COMPLETED')
+                .order('created_at', { ascending: false })
+
+            if (fetchError) throw fetchError
+
+            const mapped = data.map(session => ({
+                id: session.id,
+                routineName: session.routine_name_snapshot || 'Custom Workout',
+                status: session.status,
+                createdAt: session.created_at,
+                finishedAt: session.finished_at,
+                exercises: (session.workout_session_exercises || [])
+                    .sort((a, b) => a.order_index - b.order_index)
+                    .map(se => ({
+                        id: se.id,
+                        exerciseId: se.exercise_id,
+                        exerciseName: se.exercises.name,
+                        muscleGroup: se.exercises.muscle_group,
+                        setGroups: (se.workout_set_groups || [])
+                            .sort((a, b) => a.set_number - b.set_number)
+                            .map(g => ({
+                                id: g.id,
+                                setNumber: g.set_number,
+                                setType: g.set_type,
+                                entries: (g.workout_set_entries || [])
+                                    .sort((a, b) => a.entry_number - b.entry_number)
+                                    .map(e => ({
+                                        weight: e.weight,
+                                        weightUnit: e.weight_unit,
+                                        reps: e.reps,
+                                    }))
+                            }))
+                    }))
+            }))
+
+            setSessions(mapped)
         } catch (err) {
             console.error('Failed to fetch sessions', err)
         } finally {
@@ -69,7 +115,7 @@ export default function WorkoutHistory() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 pb-24">
+        <div className="min-h-screen bg-gray-950 pb-8">
             <Navbar />
             <div className="px-4 py-6">
 
@@ -86,7 +132,11 @@ export default function WorkoutHistory() {
                     </div>
                 ) : sessions.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-4xl mb-3">📅</p>
+                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
                         <p className="text-gray-500 text-sm">No workouts yet.</p>
                         <p className="text-gray-600 text-xs mt-1">
                             Complete your first workout to see it here.
@@ -105,7 +155,7 @@ export default function WorkoutHistory() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-white font-medium text-sm">
-                                                {session.routineName || 'Custom Workout'}
+                                                {session.routineName}
                                             </p>
                                             <p className="text-gray-500 text-xs mt-0.5">
                                                 {formatDate(session.createdAt)} · {formatTime(session.createdAt)}
@@ -147,7 +197,7 @@ export default function WorkoutHistory() {
                                                         History →
                                                     </button>
                                                 </div>
-                                                {se.setGroups?.map((group, gi) => (
+                                                {se.setGroups?.map(group => (
                                                     <div key={group.id} className="ml-2">
                                                         {group.entries.map((entry, ei) => (
                                                             <p key={ei} className="text-gray-600 text-xs py-0.5">
