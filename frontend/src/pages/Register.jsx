@@ -93,7 +93,7 @@ export default function Register() {
                                 name="email"
                                 value={form.email}
                                 onChange={handleChange}
-                                placeholder="you@example.com"
+                                placeholder="Enter your email"
                                 required
                                 autoComplete="off"
                                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
