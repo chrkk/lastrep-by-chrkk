@@ -294,7 +294,11 @@ export default function Dashboard() {
                     >
                         <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
                             <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7a2 2 0 012-2h2a2 2 0 012 2v10M9 17H7a2 2 0 01-2-2V9a2 2 0 012-2h2m6 10h2a2 2 0 002-2V9a2 2 0 00-2-2h-2" />
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                                />
                             </svg>
                         </div>
                         <p className="text-white text-sm font-medium">Routines</p>
@@ -306,7 +310,11 @@ export default function Dashboard() {
                     >
                         <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
                             <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h2v11h-2zM4 9h1.5v6H4zM15.5 6.5h2v11h-2zM18.5 9H20v6h-1.5zM8.5 11h7v2h-7z" />
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                                />
                             </svg>
                         </div>
                         <p className="text-white text-sm font-medium">Exercises</p>

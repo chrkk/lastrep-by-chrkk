@@ -16,7 +16,7 @@ const TABS = [
         label: 'Exercises',
         icon: (active) => (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M20.5 9.5l-11 11M9.5 3.5l11 11M4 14l1.5 1.5M8.5 18.5L10 20M14 4l1.5 1.5M18.5 8.5L20 10M3 17l4-4M17 3l4 4" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
         )
     },
@@ -25,7 +25,7 @@ const TABS = [
         label: 'Routines',
         icon: (active) => (
             <svg className="w-5 h-5" fill={active ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7a2 2 0 012-2h2a2 2 0 012 2v10M9 17H7a2 2 0 01-2-2V9a2 2 0 012-2h2m6 10h2a2 2 0 002-2V9a2 2 0 00-2-2h-2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
         )
     },
