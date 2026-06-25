@@ -9,6 +9,7 @@ export default function Toast({ message, type, onDismiss }) {
     if (!message) return null
 
     const isError = type === 'error'
+    const isSuccess = type === 'success'
 
     return (
         <div
@@ -19,11 +20,13 @@ export default function Toast({ message, type, onDismiss }) {
                 className={`flex items-start gap-3 px-4 py-3 rounded-2xl shadow-lg max-w-sm w-full ${
                     isError
                         ? 'bg-red-500/95 text-white'
-                        : 'bg-gray-800/95 text-white'
+                        : isSuccess
+                            ? 'bg-green-500/95 text-white'
+                            : 'bg-gray-800/95 text-white'
                 }`}
             >
                 <span className="text-lg flex-shrink-0">
-                    {isError ? '⚠️' : '✓'}
+                    {isError ? '⚠️' : isSuccess ? '✓' : '✓'}
                 </span>
                 <p className="text-sm font-medium flex-1">{message}</p>
                 <button
