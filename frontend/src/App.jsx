@@ -11,6 +11,7 @@ import WorkoutHistory from './pages/WorkoutHistory'
 import ExerciseHistory from './pages/ExerciseHistory'
 import SelectRoutine from './pages/SelectRoutine'
 import ProtectedRoute from './components/ProtectedRoute'
+import Settings from './pages/Settings'
 
 function App() {
     return (
@@ -42,6 +43,9 @@ function App() {
                     } />
                     <Route path="/exercises/:id/history" element={
                         <ProtectedRoute><ExerciseHistory /></ProtectedRoute>
+                    } />
+                    <Route path="/settings" element={
+                        <ProtectedRoute><Settings /></ProtectedRoute>
                     } />
                 </Routes>
             </BrowserRouter>
