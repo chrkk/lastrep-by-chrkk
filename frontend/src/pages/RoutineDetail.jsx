@@ -81,11 +81,15 @@ export default function RoutineDetail() {
     async function handleStartWorkout() {
         setStarting(true)
         try {
-            const { data, error: rpcError } = await supabase
-                .rpc('start_workout_session', { routine_id_input: parseInt(id) })
+            const sessionId = crypto.randomUUID()
+            const { error: rpcError } = await supabase
+                .rpc('start_workout_session', {
+                    routine_id_input: id,
+                    session_id_input: sessionId
+                })
 
             if (rpcError) throw rpcError
-            navigate(`/workout/${data}`)
+            navigate(`/workout/${sessionId}`)
         } catch (err) {
             console.error('Failed to start workout', err)
             setToast({ message: 'Failed to start workout. Try again.', type: 'error' })

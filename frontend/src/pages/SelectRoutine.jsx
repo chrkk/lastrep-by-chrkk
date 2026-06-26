@@ -37,11 +37,15 @@ export default function SelectRoutine() {
     async function handleSelect(routineId) {
         setStarting(routineId)
         try {
+            const sessionId = crypto.randomUUID()
             const { data, error: rpcError } = await supabase
-                .rpc('start_workout_session', { routine_id_input: routineId })
+                .rpc('start_workout_session', {
+                    routine_id_input: routineId,
+                    session_id_input: sessionId
+                })
 
             if (rpcError) throw rpcError
-            navigate(`/workout/${data}`)
+            navigate(`/workout/${sessionId}`)
         } catch (err) {
             console.error('Failed to start session', err)
             setStarting(null)

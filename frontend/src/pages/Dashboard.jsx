@@ -131,13 +131,15 @@ export default function Dashboard() {
         if (!dashboard?.suggestedRoutineId) return
         setStarting(true)
         try {
-            const { data, error: rpcError } = await supabase
+            const sessionId = crypto.randomUUID()
+            const { error: rpcError } = await supabase
                 .rpc('start_workout_session', {
-                    routine_id_input: dashboard.suggestedRoutineId
+                    routine_id_input: dashboard.suggestedRoutineId,
+                    session_id_input: sessionId
                 })
 
             if (rpcError) throw rpcError
-            navigate(`/workout/${data}`)
+            navigate(`/workout/${sessionId}`)
         } catch (err) {
             console.error('Failed to start workout', err)
         } finally {
