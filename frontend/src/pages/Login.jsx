@@ -110,7 +110,16 @@ export default function Login() {
                     </Link>
                 </p>
 
+                <button
+                    onClick={() => navigate('/')}
+                    className="w-full text-gray-600 text-xs mt-3 py-2"
+                >
+                    Continue as guest
+                </button>
+
             </div>
+
+
         </div>
     )
 }
