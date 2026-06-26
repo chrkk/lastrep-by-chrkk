@@ -57,6 +57,11 @@ export default function Register() {
                 return
             }
 
+            if (data.user && data.user.identities && data.user.identities.length === 0) {
+                setError('An account with this email already exists. Try logging in instead.')
+                return
+            }
+
             if (data.user && !data.session) {
                 setRegistered(true)
                 return
