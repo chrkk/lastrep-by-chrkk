@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
+
 const MUSCLE_GROUPS = [
     'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps',
     'Legs', 'Glutes', 'Core', 'Cardio', 'Full Body', 'Other'
@@ -24,6 +25,7 @@ export default function Exercises() {
     const [deleteTarget, setDeleteTarget] = useState(null)
     const [deleting, setDeleting] = useState(false)
     const [toast, setToast] = useState(null)
+    const { userId } = useAuthStore()
 
     useEffect(() => {
         fetchExercises()
@@ -97,11 +99,10 @@ export default function Exercises() {
 
                 if (updateError) throw updateError
             } else {
-                const { data: userData } = await supabase.auth.getUser()
                 const { error: insertError } = await supabase
                     .from('exercises')
                     .insert({
-                        user_id: userData.user.id,
+                        user_id: userId,
                         name: form.name,
                         muscle_group: form.muscleGroup || null,
                         equipment: form.equipment || null,
