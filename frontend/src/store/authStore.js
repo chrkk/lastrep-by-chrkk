@@ -24,6 +24,10 @@ export const useAuthStore = create((set, get) => ({
     initialized: false,
 
     initialize: async () => {
+        const { db } = await import('../lib/db')
+        await db.open()
+
+
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session) {
