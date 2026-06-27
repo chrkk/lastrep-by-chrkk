@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
+import { useAuthStore } from '../store/authStore'
 
 export default function Routines() {
     const navigate = useNavigate()
@@ -17,6 +18,8 @@ export default function Routines() {
     const [deleting, setDeleting] = useState(false)
     const [duplicating, setDuplicating] = useState(null)
     const [toast, setToast] = useState(null)
+    const { userId } = useAuthStore()
+
 
     useEffect(() => {
         fetchRoutines()
@@ -92,8 +95,6 @@ export default function Routines() {
 
                 if (updateError) throw updateError
             } else {
-                const { data: userData } = await supabase.auth.getUser()
-
                 const { data: existing, error: countError } = await supabase
                     .from('routines')
                     .select('routine_order')
@@ -107,7 +108,7 @@ export default function Routines() {
                 const { error: insertError } = await supabase
                     .from('routines')
                     .insert({
-                        user_id: userData.user.id,
+                        user_id: userId,
                         name: form.name,
                         description: form.description || null,
                         routine_order: nextOrder,
