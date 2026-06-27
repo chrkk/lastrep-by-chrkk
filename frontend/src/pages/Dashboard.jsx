@@ -36,8 +36,10 @@ export default function Dashboard() {
     async function fetchDashboard() {
         try {
             const { data: userData } = await supabase.auth.getUser()
-            const user = userData.user
-            const displayName = user.user_metadata?.name || user.email?.split('@')[0] || 'there'
+            const user = userData?.user
+            const displayName = user?.user_metadata?.name
+                || user?.email?.split('@')[0]
+                || 'there'
             setName(displayName)
 
             const [
