@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
+import { useAuthStore } from '../store/authStore'
 
 
 const MUSCLE_GROUPS = [
