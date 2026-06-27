@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../store/authStore'
 import ExerciseSetCard from '../components/ExerciseSetCard'
 import ExerciseMenu from '../components/ExerciseMenu'
 import Toast from '../components/Toast'
@@ -8,6 +9,7 @@ import Toast from '../components/Toast'
 export default function StartWorkout() {
     const { sessionId } = useParams()
     const navigate = useNavigate()
+    const { userId } = useAuthStore()
 
     const [session, setSession] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -21,6 +23,7 @@ export default function StartWorkout() {
     const [menuExercise, setMenuExercise] = useState(null)
     const [exerciseMeta, setExerciseMeta] = useState({})
     const [toast, setToast] = useState(null)
+    const [loadError, setLoadError] = useState(false)
     const timerRef = useRef(null)
 
     useEffect(() => {
@@ -44,8 +47,6 @@ export default function StartWorkout() {
         return () => { document.body.style.overflow = '' }
     }, [showFinishModal, showAddExercise, menuExercise, showReplaceFor])
 
-    const [loadError, setLoadError] = useState(false)
-
     async function fetchSession() {
         try {
             const { data: sessionData, error: sessionError } = await supabase
@@ -59,13 +60,13 @@ export default function StartWorkout() {
             const { data: exercisesData, error: exercisesError } = await supabase
                 .from('workout_session_exercises')
                 .select(`
-                *,
-                exercises(name, muscle_group),
-                workout_set_groups(
                     *,
-                    workout_set_entries(*)
-                )
-            `)
+                    exercises(name, muscle_group),
+                    workout_set_groups(
+                        *,
+                        workout_set_entries(*)
+                    )
+                `)
                 .eq('workout_session_id', sessionId)
                 .order('order_index', { ascending: true })
 
@@ -142,15 +143,15 @@ export default function StartWorkout() {
                     const { data, error: perfError } = await supabase
                         .from('workout_session_exercises')
                         .select(`
-                        exercise_id,
-                        exercises(name),
-                        workout_session_id,
-                        workout_sessions!inner(id, created_at, status),
-                        workout_set_groups(
-                            *,
-                            workout_set_entries(*)
-                        )
-                    `)
+                            exercise_id,
+                            exercises(name),
+                            workout_session_id,
+                            workout_sessions!inner(id, created_at, status),
+                            workout_set_groups(
+                                *,
+                                workout_set_entries(*)
+                            )
+                        `)
                         .eq('exercise_id', se.exerciseId)
                         .eq('workout_sessions.status', 'COMPLETED')
                         .neq('workout_session_id', sessionId)
@@ -209,13 +210,13 @@ export default function StartWorkout() {
         const { data: exercisesData } = await supabase
             .from('workout_session_exercises')
             .select(`
-            *,
-            exercises(name, muscle_group),
-            workout_set_groups(
                 *,
-                workout_set_entries(*)
-            )
-        `)
+                exercises(name, muscle_group),
+                workout_set_groups(
+                    *,
+                    workout_set_entries(*)
+                )
+            `)
             .eq('workout_session_id', sessionId)
             .order('order_index', { ascending: true })
 
@@ -282,9 +283,6 @@ export default function StartWorkout() {
 
     async function handleLogSet(seId, payload) {
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const userId = userData.user.id
-
             const currentSe = session.exercises.find(e => e.id === seId)
             const nextSetNumber = (currentSe?.setGroups?.length || 0) + 1
 
@@ -350,9 +348,6 @@ export default function StartWorkout() {
 
     async function handleAddExercise(exerciseId) {
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const userId = userData.user.id
-
             const nextIndex = session.exercises.length
 
             const { data: seData, error: insertError } = await supabase
@@ -391,12 +386,12 @@ export default function StartWorkout() {
                 const { data: perfData } = await supabase
                     .from('workout_session_exercises')
                     .select(`
-                    exercise_id,
-                    exercises(name),
-                    workout_session_id,
-                    workout_sessions!inner(id, created_at, status),
-                    workout_set_groups(*, workout_set_entries(*))
-                `)
+                        exercise_id,
+                        exercises(name),
+                        workout_session_id,
+                        workout_sessions!inner(id, created_at, status),
+                        workout_set_groups(*, workout_set_entries(*))
+                    `)
                     .eq('exercise_id', exerciseId)
                     .eq('workout_sessions.status', 'COMPLETED')
                     .neq('workout_session_id', sessionId)
@@ -473,9 +468,6 @@ export default function StartWorkout() {
     async function handleAutoFinish() {
         setFinishing(true)
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const userId = userData.user.id
-
             for (const se of session.exercises) {
                 const target = se.targetSets || 3
                 const logged = se.setGroups?.length || 0
