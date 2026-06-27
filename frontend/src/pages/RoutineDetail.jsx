@@ -28,6 +28,7 @@ export default function RoutineDetail() {
     const [error, setError] = useState('')
     const [toast, setToast] = useState(null)
     const [reordering, setReordering] = useState(false)
+    const { userId } = useAuthStore()
 
     useEffect(() => {
         fetchRoutine()
@@ -136,13 +137,12 @@ export default function RoutineDetail() {
         setSaving(true)
         setError('')
         try {
-            const { data: userData } = await supabase.auth.getUser()
             const nextIndex = routine.exercises?.length || 0
 
             const { error: insertError } = await supabase
                 .from('routine_exercises')
                 .insert({
-                    user_id: userData.user.id,
+                    user_id: userId,
                     routine_id: id,
                     exercise_id: targetForm.exerciseId,
                     order_index: nextIndex,
