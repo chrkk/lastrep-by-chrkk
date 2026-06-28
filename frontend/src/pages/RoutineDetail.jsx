@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useRoutineDetail } from '../hooks/useRoutineDetail'
+import { useExercises } from '../hooks/useExercises'
+import { useStartSession } from '../hooks/useStartSession'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
 export default function RoutineDetail() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const { routine, loading, addExerciseToRoutine, removeExerciseFromRoutine, reorderExercises } = useRoutineDetail(id)
+    const { exercises } = useExercises()
+    const { startSession } = useStartSession()
 
-    const [routine, setRoutine] = useState(null)
-    const [exercises, setExercises] = useState([])
-    const [starting, setStarting] = useState(false)
-    const [loading, setLoading] = useState(true)
     const [showAddExercise, setShowAddExercise] = useState(false)
     const [showTargetForm, setShowTargetForm] = useState(false)
     const [selectedExercise, setSelectedExercise] = useState(null)
     const [removeTarget, setRemoveTarget] = useState(null)
     const [removing, setRemoving] = useState(false)
+    const [starting, setStarting] = useState(false)
     const [targetForm, setTargetForm] = useState({
         exerciseId: '',
         targetSets: 3,
@@ -28,12 +30,6 @@ export default function RoutineDetail() {
     const [error, setError] = useState('')
     const [toast, setToast] = useState(null)
     const [reordering, setReordering] = useState(false)
-    const { userId } = useAuthStore()
-
-    useEffect(() => {
-        fetchRoutine()
-        fetchExercises()
-    }, [id])
 
     useEffect(() => {
         const open = showAddExercise || showTargetForm || removeTarget !== null
@@ -41,75 +37,16 @@ export default function RoutineDetail() {
         return () => { document.body.style.overflow = '' }
     }, [showAddExercise, showTargetForm, removeTarget])
 
-    async function fetchRoutine() {
-        try {
-            const { data: routineData, error: routineError } = await supabase
-                .from('routines')
-                .select('*')
-                .eq('id', id)
-                .single()
-
-            if (routineError) throw routineError
-
-            const { data: reData, error: reError } = await supabase
-                .from('routine_exercises')
-                .select('*, exercises(name, muscle_group)')
-                .eq('routine_id', id)
-                .order('order_index', { ascending: true })
-
-            if (reError) throw reError
-
-            const mappedExercises = reData.map(re => ({
-                id: re.id,
-                exerciseId: re.exercise_id,
-                exerciseName: re.exercises.name,
-                muscleGroup: re.exercises.muscle_group,
-                orderIndex: re.order_index,
-                targetSets: re.target_sets,
-                targetMinReps: re.target_min_reps,
-                targetMaxReps: re.target_max_reps,
-                restSeconds: re.rest_seconds,
-            }))
-
-            setRoutine({ ...routineData, exercises: mappedExercises })
-        } catch (err) {
-            console.error('Failed to fetch routine', err)
-        } finally {
-            setLoading(false)
-        }
-    }
-
     async function handleStartWorkout() {
         setStarting(true)
         try {
-            const sessionId = crypto.randomUUID()
-            const { error: rpcError } = await supabase
-                .rpc('start_workout_session', {
-                    routine_id_input: id,
-                    session_id_input: sessionId
-                })
-
-            if (rpcError) throw rpcError
+            const sessionId = await startSession(id)
             navigate(`/workout/${sessionId}`)
         } catch (err) {
             console.error('Failed to start workout', err)
             setToast({ message: 'Failed to start workout. Try again.', type: 'error' })
         } finally {
             setStarting(false)
-        }
-    }
-
-    async function fetchExercises() {
-        try {
-            const { data, error: fetchError } = await supabase
-                .from('exercises')
-                .select('*')
-                .order('name', { ascending: true })
-
-            if (fetchError) throw fetchError
-            setExercises(data)
-        } catch (err) {
-            console.error('Failed to fetch exercises', err)
         }
     }
 
@@ -137,28 +74,10 @@ export default function RoutineDetail() {
         setSaving(true)
         setError('')
         try {
-            const nextIndex = routine.exercises?.length || 0
-
-            const { error: insertError } = await supabase
-                .from('routine_exercises')
-                .insert({
-                    user_id: userId,
-                    routine_id: id,
-                    exercise_id: targetForm.exerciseId,
-                    order_index: nextIndex,
-                    target_sets: targetForm.targetSets,
-                    target_min_reps: targetForm.targetMinReps,
-                    target_max_reps: targetForm.targetMaxReps,
-                    rest_seconds: targetForm.restSeconds,
-                })
-
-            if (insertError) throw insertError
-
-            await fetchRoutine()
+            await addExerciseToRoutine(selectedExercise, targetForm)
             setShowTargetForm(false)
             setSelectedExercise(null)
         } catch (err) {
-            console.error(err)
             setError('Failed to add exercise.')
         } finally {
             setSaving(false)
@@ -173,15 +92,8 @@ export default function RoutineDetail() {
         if (!removeTarget) return
         setRemoving(true)
         try {
-            const { error: deleteError } = await supabase
-                .from('routine_exercises')
-                .delete()
-                .eq('id', removeTarget.id)
-
-            if (deleteError) throw deleteError
-            await fetchRoutine()
+            await removeExerciseFromRoutine(removeTarget.id)
         } catch (err) {
-            console.error('Failed to remove exercise', err)
             setToast({ message: 'Failed to remove exercise. Try again.', type: 'error' })
         } finally {
             setRemoving(false)
@@ -195,27 +107,14 @@ export default function RoutineDetail() {
         if (newIndex < 0 || newIndex >= routine.exercises.length) return
 
         const previousOrder = routine.exercises
-
         const reordered = [...routine.exercises]
         const [moved] = reordered.splice(index, 1)
         reordered.splice(newIndex, 0, moved)
 
-        setRoutine(prev => ({ ...prev, exercises: reordered }))
         setReordering(true)
-
         try {
-            const updates = reordered.map((re, i) =>
-                supabase
-                    .from('routine_exercises')
-                    .update({ order_index: i })
-                    .eq('id', re.id)
-            )
-            const results = await Promise.all(updates)
-            const failed = results.find(r => r.error)
-            if (failed) throw failed.error
+            await reorderExercises(reordered)
         } catch (err) {
-            console.error('Failed to reorder', err)
-            setRoutine(prev => ({ ...prev, exercises: previousOrder }))
             setToast({ message: 'Failed to save order. Try again.', type: 'error' })
         } finally {
             setReordering(false)
@@ -254,10 +153,7 @@ export default function RoutineDetail() {
                 onDismiss={() => setToast(null)}
             />
 
-            <div
-                className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3"
-                style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-            >
+            <div className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3">
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate('/routines')}
@@ -279,7 +175,6 @@ export default function RoutineDetail() {
             </div>
 
             <div className="px-4 py-6">
-
                 {routine.description && (
                     <p className="text-gray-500 text-sm mb-5">{routine.description}</p>
                 )}
@@ -311,17 +206,12 @@ export default function RoutineDetail() {
                             </svg>
                         </div>
                         <p className="text-gray-500 text-sm">No exercises in this routine.</p>
-                        <p className="text-gray-600 text-xs mt-1">
-                            Tap + Add Exercise to get started.
-                        </p>
+                        <p className="text-gray-600 text-xs mt-1">Tap + Add Exercise to get started.</p>
                     </div>
                 ) : (
                     <div className="space-y-2 mb-6">
                         {routine.exercises.map((re, index) => (
-                            <div
-                                key={re.id}
-                                className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4"
-                            >
+                            <div key={re.id} className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="flex flex-col gap-0.5 flex-shrink-0">
@@ -345,14 +235,10 @@ export default function RoutineDetail() {
                                             </button>
                                         </div>
                                         <div className="w-7 h-7 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-gray-400 text-xs font-medium">
-                                                {index + 1}
-                                            </span>
+                                            <span className="text-gray-400 text-xs font-medium">{index + 1}</span>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-white font-medium text-sm truncate">
-                                                {re.exerciseName}
-                                            </p>
+                                            <p className="text-white font-medium text-sm truncate">{re.exerciseName}</p>
                                             <div className="flex flex-wrap gap-2 mt-1">
                                                 {re.muscleGroup && (
                                                     <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
@@ -391,27 +277,17 @@ export default function RoutineDetail() {
 
             {showAddExercise && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setShowAddExercise(false)}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setShowAddExercise(false)} />
                     <div className="relative bg-gray-900 rounded-t-3xl z-10 flex flex-col max-h-[80vh]">
                         <div className="px-5 pt-5 pb-3 flex-shrink-0">
                             <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-                            <h2 className="text-white font-semibold text-lg">
-                                Choose Exercise
-                            </h2>
-                            <p className="text-gray-500 text-xs mt-1">
-                                Tap an exercise to add it to this routine
-                            </p>
+                            <h2 className="text-white font-semibold text-lg">Choose Exercise</h2>
+                            <p className="text-gray-500 text-xs mt-1">Tap an exercise to add it to this routine</p>
                         </div>
-
                         <div className="overflow-y-auto px-5" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                             {availableExercises.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <p className="text-gray-500 text-sm">
-                                        All exercises are already in this routine.
-                                    </p>
+                                    <p className="text-gray-500 text-sm">All exercises are already in this routine.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2 mt-2">
@@ -421,19 +297,13 @@ export default function RoutineDetail() {
                                             onClick={() => selectExercise(exercise)}
                                             className="w-full bg-gray-800 active:bg-gray-700 border border-gray-700 rounded-xl px-4 py-3 text-left transition-colors"
                                         >
-                                            <p className="text-white text-sm font-medium">
-                                                {exercise.name}
-                                            </p>
+                                            <p className="text-white text-sm font-medium">{exercise.name}</p>
                                             <div className="flex gap-2 mt-1">
-                                                {exercise.muscle_group && (
-                                                    <span className="text-xs text-orange-400">
-                                                        {exercise.muscle_group}
-                                                    </span>
+                                                {exercise.muscleGroup && (
+                                                    <span className="text-xs text-orange-400">{exercise.muscleGroup}</span>
                                                 )}
                                                 {exercise.equipment && (
-                                                    <span className="text-xs text-gray-500">
-                                                        {exercise.equipment}
-                                                    </span>
+                                                    <span className="text-xs text-gray-500">{exercise.equipment}</span>
                                                 )}
                                             </div>
                                         </button>
@@ -447,19 +317,11 @@ export default function RoutineDetail() {
 
             {showTargetForm && selectedExercise && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setShowTargetForm(false)}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setShowTargetForm(false)} />
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-
-                        <h2 className="text-white font-semibold text-lg mb-1">
-                            Set Targets
-                        </h2>
-                        <p className="text-gray-500 text-xs mb-5">
-                            {selectedExercise.name}
-                        </p>
+                        <h2 className="text-white font-semibold text-lg mb-1">Set Targets</h2>
+                        <p className="text-gray-500 text-xs mb-5">{selectedExercise.name}</p>
 
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3 mb-4">
@@ -468,11 +330,8 @@ export default function RoutineDetail() {
                         )}
 
                         <form onSubmit={handleAddExercise} className="space-y-4">
-
                             <div>
-                                <label className="block text-gray-400 text-sm mb-3">
-                                    Target sets
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-3">Target sets</label>
                                 <div className="flex gap-2">
                                     {[1, 2, 3, 4, 5].map(n => (
                                         <button
@@ -480,9 +339,7 @@ export default function RoutineDetail() {
                                             type="button"
                                             onClick={() => setTargetForm({ ...targetForm, targetSets: n })}
                                             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                                                targetForm.targetSets === n
-                                                    ? 'bg-orange-500 text-white'
-                                                    : 'bg-gray-800 text-gray-400'
+                                                targetForm.targetSets === n ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'
                                             }`}
                                         >
                                             {n}
@@ -492,22 +349,15 @@ export default function RoutineDetail() {
                             </div>
 
                             <div>
-                                <label className="block text-gray-400 text-sm mb-3">
-                                    Rep range
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-3">Rep range</label>
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1">
                                         <p className="text-gray-600 text-xs mb-1.5 text-center">Min</p>
                                         <input
                                             type="number"
                                             value={targetForm.targetMinReps}
-                                            onChange={e => setTargetForm({
-                                                ...targetForm,
-                                                targetMinReps: parseInt(e.target.value)
-                                            })}
-                                            min="1"
-                                            max="100"
-                                            autoComplete="off"
+                                            onChange={e => setTargetForm({ ...targetForm, targetMinReps: parseInt(e.target.value) })}
+                                            min="1" max="100" autoComplete="off"
                                             className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm text-center focus:outline-none focus:border-orange-500"
                                         />
                                     </div>
@@ -517,13 +367,8 @@ export default function RoutineDetail() {
                                         <input
                                             type="number"
                                             value={targetForm.targetMaxReps}
-                                            onChange={e => setTargetForm({
-                                                ...targetForm,
-                                                targetMaxReps: parseInt(e.target.value)
-                                            })}
-                                            min="1"
-                                            max="100"
-                                            autoComplete="off"
+                                            onChange={e => setTargetForm({ ...targetForm, targetMaxReps: parseInt(e.target.value) })}
+                                            min="1" max="100" autoComplete="off"
                                             className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm text-center focus:outline-none focus:border-orange-500"
                                         />
                                     </div>
@@ -531,9 +376,7 @@ export default function RoutineDetail() {
                             </div>
 
                             <div>
-                                <label className="block text-gray-400 text-sm mb-3">
-                                    Default rest timer
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-3">Default rest timer</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {[30, 60, 90, 120, 180, 300].map(s => (
                                         <button
@@ -541,9 +384,7 @@ export default function RoutineDetail() {
                                             type="button"
                                             onClick={() => setTargetForm({ ...targetForm, restSeconds: s })}
                                             className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                                                targetForm.restSeconds === s
-                                                    ? 'bg-orange-500 text-white'
-                                                    : 'bg-gray-800 text-gray-400'
+                                                targetForm.restSeconds === s ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'
                                             }`}
                                         >
                                             {s < 60 ? `${s}s` : s === 60 ? '1min' : s === 90 ? '1.5min' : s === 120 ? '2min' : s === 180 ? '3min' : '5min'}
@@ -575,14 +416,8 @@ export default function RoutineDetail() {
 
             {removeTarget && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setRemoveTarget(null)}
-                    />
-                    <div
-                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
-                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
-                    >
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setRemoveTarget(null)} />
+                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
                         <div className="text-center mb-6">
                             <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
