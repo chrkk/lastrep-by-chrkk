@@ -45,6 +45,44 @@ async function getPendingCounts(userId) {
     return counts
 }
 
+async function syncTable(tableName, userId) {
+    const table = db[tableName]
+
+    const pendingRows = await table.where('[userId+syncStatus]').equals([userId, 'pending']).toArray()
+
+    for (const row of pendingRows) {
+        const { syncStatus, ...payload } = row
+
+        const { error } = await supabase
+            .from(tableName)
+            .upsert(payload, { onConflict: 'id' })
+
+        if (error) {
+            throw error
+        }
+
+        await table.update(row.id, {
+            syncStatus: 'synced',
+            updatedAt: new Date().toISOString(),
+        })
+    }
+
+    const pendingDeletes = await table.where('[userId+syncStatus]').equals([userId, 'pending_delete']).toArray()
+
+    for (const row of pendingDeletes) {
+        const { error } = await supabase
+            .from(tableName)
+            .delete()
+            .eq('id', row.id)
+
+        if (error) {
+            throw error
+        }
+
+        await table.delete(row.id)
+    }
+}
+
 export async function syncNow() {
     if (running) return { skipped: true, reason: 'already-running' }
 
@@ -68,6 +106,15 @@ export async function syncNow() {
         if (!reachable) {
             return { skipped: true, reason: 'server-unreachable' }
         }
+
+        for (const tableName of syncableTables) {
+            await syncTable(tableName, userId)
+        }
+
+        await db.meta.put({
+            key: 'lastSyncedAt',
+            value: new Date().toISOString(),
+        })
 
         const counts = await getPendingCounts(userId)
         return { skipped: false, counts }

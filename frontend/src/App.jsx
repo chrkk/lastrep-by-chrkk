@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { supabase } from './lib/supabase'
-import { initializeSyncEngine, migrateGuestData } from './lib/sync'
+import { initializeSyncEngine, migrateGuestData, syncNow } from './lib/sync'
 import MobileOnly from './components/MobileOnly'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -38,6 +38,9 @@ function App() {
                     }
 
                     signIn(session.user.id)
+                    syncNow().catch(error => {
+                        console.error('Failed to sync after sign-in', error)
+                    })
                 }
                 if (event === 'SIGNED_OUT') {
                     signOut()
