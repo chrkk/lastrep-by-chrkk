@@ -35,27 +35,40 @@ export default function Register() {
         }
 
         setLoading(true)
-
         try {
             const { data, error: signUpError } = await supabase.auth.signUp({
                 email: form.email,
                 password: form.password,
                 options: {
-                    data: {
-                        name: form.name
-                    }
+                    data: { name: form.name }
                 }
             })
 
             if (signUpError) {
-                setError(signUpError.message)
+                if (
+                    signUpError.message.toLowerCase().includes('already registered') ||
+                    signUpError.message.toLowerCase().includes('already in use') ||
+                    signUpError.message.toLowerCase().includes('user already exists')
+                ) {
+                    setError('An account with this email already exists. Try logging in instead.')
+                } else {
+                    setError(signUpError.message || 'Registration failed. Please try again.')
+                }
+                return
+            }
+
+            if (data.user && data.user.identities && data.user.identities.length === 0) {
+                setError('An account with this email already exists. Try logging in instead.')
+                return
+            }
+
+            if (data.user && !data.session) {
+                setRegistered(true)
                 return
             }
 
             if (data.session) {
                 navigate('/')
-            } else {
-                setRegistered(true)
             }
         } catch (err) {
             setError('Registration failed. Please try again.')

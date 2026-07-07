@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useWorkoutSession } from '../hooks/useWorkoutSession'
+import { useExercises } from '../hooks/useExercises'
+import { db } from '../lib/db'
+import { useAuthStore } from '../store/authStore'
 import ExerciseSetCard from '../components/ExerciseSetCard'
 import ExerciseMenu from '../components/ExerciseMenu'
 import Toast from '../components/Toast'
@@ -8,14 +11,25 @@ import Toast from '../components/Toast'
 export default function StartWorkout() {
     const { sessionId } = useParams()
     const navigate = useNavigate()
+    const { userId } = useAuthStore()
+    const {
+        session,
+        loading,
+        loadError,
+        logSet,
+        deleteSet,
+        addExerciseToSession,
+        finishSession,
+        cancelSession,
+        getLastPerformance,
+        refetch,
+    } = useWorkoutSession(sessionId)
+    const { exercises: allExercises } = useExercises()
 
-    const [session, setSession] = useState(null)
-    const [loading, setLoading] = useState(true)
     const [elapsed, setElapsed] = useState(0)
     const [showFinishModal, setShowFinishModal] = useState(false)
     const [showAddExercise, setShowAddExercise] = useState(false)
     const [showReplaceFor, setShowReplaceFor] = useState(null)
-    const [allExercises, setAllExercises] = useState([])
     const [finishing, setFinishing] = useState(false)
     const [lastPerformances, setLastPerformances] = useState({})
     const [menuExercise, setMenuExercise] = useState(null)
@@ -24,9 +38,10 @@ export default function StartWorkout() {
     const timerRef = useRef(null)
 
     useEffect(() => {
-        fetchSession()
-        fetchAllExercises()
-    }, [sessionId])
+        if (!session) return
+        loadLastPerformances(session.exercises)
+        initMeta(session.exercises)
+    }, [session?.id])
 
     useEffect(() => {
         if (!session) return
@@ -44,144 +59,12 @@ export default function StartWorkout() {
         return () => { document.body.style.overflow = '' }
     }, [showFinishModal, showAddExercise, menuExercise, showReplaceFor])
 
-    const [loadError, setLoadError] = useState(false)
-
-    async function fetchSession() {
-        try {
-            const { data: sessionData, error: sessionError } = await supabase
-                .from('workout_sessions')
-                .select('*')
-                .eq('id', sessionId)
-                .single()
-
-            if (sessionError) throw sessionError
-
-            const { data: exercisesData, error: exercisesError } = await supabase
-                .from('workout_session_exercises')
-                .select(`
-                *,
-                exercises(name, muscle_group),
-                workout_set_groups(
-                    *,
-                    workout_set_entries(*)
-                )
-            `)
-                .eq('workout_session_id', sessionId)
-                .order('order_index', { ascending: true })
-
-            if (exercisesError) throw exercisesError
-
-            const mappedExercises = exercisesData.map(se => ({
-                id: se.id,
-                exerciseId: se.exercise_id,
-                exerciseName: se.exercises.name,
-                muscleGroup: se.exercises.muscle_group,
-                orderIndex: se.order_index,
-                targetSets: se.target_sets,
-                targetMinReps: se.target_min_reps,
-                targetMaxReps: se.target_max_reps,
-                restSeconds: se.rest_seconds,
-                setGroups: (se.workout_set_groups || [])
-                    .sort((a, b) => a.set_number - b.set_number)
-                    .map(g => ({
-                        id: g.id,
-                        setNumber: g.set_number,
-                        setType: g.set_type,
-                        entries: (g.workout_set_entries || [])
-                            .sort((a, b) => a.entry_number - b.entry_number)
-                            .map(e => ({
-                                id: e.id,
-                                weight: e.weight,
-                                weightUnit: e.weight_unit,
-                                reps: e.reps,
-                                reachedFailure: e.reached_failure,
-                            }))
-                    }))
-            }))
-
-            const fullSession = {
-                id: sessionData.id,
-                routineId: sessionData.routine_id,
-                routineName: sessionData.routine_name_snapshot,
-                status: sessionData.status,
-                createdAt: sessionData.created_at,
-                finishedAt: sessionData.finished_at,
-                exercises: mappedExercises,
-            }
-
-            setSession(fullSession)
-            await fetchLastPerformances(mappedExercises)
-            initMeta(mappedExercises)
-        } catch (err) {
-            console.error('Failed to fetch session', err)
-            setLoadError(true)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    async function fetchAllExercises() {
-        try {
-            const { data, error: fetchError } = await supabase
-                .from('exercises')
-                .select('*')
-                .order('name', { ascending: true })
-
-            if (fetchError) throw fetchError
-            setAllExercises(data)
-        } catch (err) {
-            console.error('Failed to fetch exercises', err)
-        }
-    }
-
-    async function fetchLastPerformances(sessionExercises) {
+    async function loadLastPerformances(sessionExercises) {
         const performances = {}
         await Promise.all(
             sessionExercises.map(async se => {
-                try {
-                    const { data, error: perfError } = await supabase
-                        .from('workout_session_exercises')
-                        .select(`
-                        exercise_id,
-                        exercises(name),
-                        workout_session_id,
-                        workout_sessions!inner(id, created_at, status),
-                        workout_set_groups(
-                            *,
-                            workout_set_entries(*)
-                        )
-                    `)
-                        .eq('exercise_id', se.exerciseId)
-                        .eq('workout_sessions.status', 'COMPLETED')
-                        .neq('workout_session_id', sessionId)
-                        .order('workout_sessions(created_at)', { ascending: false })
-                        .limit(1)
-
-                    if (perfError || !data || data.length === 0) return
-
-                    const last = data[0]
-                    if (!last.workout_set_groups || last.workout_set_groups.length === 0) return
-
-                    performances[se.exerciseId] = {
-                        exerciseId: se.exerciseId,
-                        exerciseName: last.exercises.name,
-                        date: last.workout_sessions.created_at,
-                        setGroups: last.workout_set_groups
-                            .sort((a, b) => a.set_number - b.set_number)
-                            .map(g => ({
-                                id: g.id,
-                                setNumber: g.set_number,
-                                setType: g.set_type,
-                                entries: (g.workout_set_entries || [])
-                                    .sort((a, b) => a.entry_number - b.entry_number)
-                                    .map(e => ({
-                                        weight: e.weight,
-                                        weightUnit: e.weight_unit,
-                                        reps: e.reps,
-                                    }))
-                            }))
-                    }
-                } catch (_) {}
+                const perf = await getLastPerformance(se.exerciseId)
+                if (perf) performances[se.exerciseId] = perf
             })
         )
         setLastPerformances(performances)
@@ -197,68 +80,6 @@ export default function StartWorkout() {
             }
         })
         setExerciseMeta(meta)
-    }
-
-    async function refetchSession() {
-        const { data: sessionData } = await supabase
-            .from('workout_sessions')
-            .select('*')
-            .eq('id', sessionId)
-            .single()
-
-        const { data: exercisesData } = await supabase
-            .from('workout_session_exercises')
-            .select(`
-            *,
-            exercises(name, muscle_group),
-            workout_set_groups(
-                *,
-                workout_set_entries(*)
-            )
-        `)
-            .eq('workout_session_id', sessionId)
-            .order('order_index', { ascending: true })
-
-        const mappedExercises = (exercisesData || []).map(se => ({
-            id: se.id,
-            exerciseId: se.exercise_id,
-            exerciseName: se.exercises.name,
-            muscleGroup: se.exercises.muscle_group,
-            orderIndex: se.order_index,
-            targetSets: se.target_sets,
-            targetMinReps: se.target_min_reps,
-            targetMaxReps: se.target_max_reps,
-            restSeconds: se.rest_seconds,
-            setGroups: (se.workout_set_groups || [])
-                .sort((a, b) => a.set_number - b.set_number)
-                .map(g => ({
-                    id: g.id,
-                    setNumber: g.set_number,
-                    setType: g.set_type,
-                    entries: (g.workout_set_entries || [])
-                        .sort((a, b) => a.entry_number - b.entry_number)
-                        .map(e => ({
-                            id: e.id,
-                            weight: e.weight,
-                            weightUnit: e.weight_unit,
-                            reps: e.reps,
-                            reachedFailure: e.reached_failure,
-                        }))
-                }))
-        }))
-
-        const updatedSession = {
-            id: sessionData.id,
-            routineId: sessionData.routine_id,
-            routineName: sessionData.routine_name_snapshot,
-            status: sessionData.status,
-            createdAt: sessionData.created_at,
-            finishedAt: sessionData.finished_at,
-            exercises: mappedExercises,
-        }
-
-        setSession(updatedSession)
-        return updatedSession
     }
 
     function formatTime(seconds) {
@@ -282,189 +103,49 @@ export default function StartWorkout() {
 
     async function handleLogSet(seId, payload) {
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const userId = userData.user.id
-
-            const currentSe = session.exercises.find(e => e.id === seId)
-            const nextSetNumber = (currentSe?.setGroups?.length || 0) + 1
-
-            const { data: groupData, error: groupError } = await supabase
-                .from('workout_set_groups')
-                .insert({
-                    user_id: userId,
-                    session_exercise_id: seId,
-                    set_number: nextSetNumber,
-                    set_type: payload.setType || 'NORMAL',
-                })
-                .select()
-                .single()
-
-            if (groupError) throw groupError
-
-            const entries = payload.entries.map((entry, i) => ({
-                user_id: userId,
-                set_group_id: groupData.id,
-                entry_number: i + 1,
-                weight: entry.weight,
-                weight_unit: entry.weightUnit,
-                reps: entry.reps,
-                reached_failure: entry.reachedFailure || false,
-            }))
-
-            const { error: entriesError } = await supabase
-                .from('workout_set_entries')
-                .insert(entries)
-
-            if (entriesError) throw entriesError
-
-            const updatedSession = await refetchSession()
-            return updatedSession
+            return await logSet(seId, payload)
         } catch (err) {
             console.error('Failed to log set', err)
-            setToast({
-                message: 'Failed to save set. Check your connection and try again.',
-                type: 'error'
-            })
+            setToast({ message: 'Failed to save set locally. Try again.', type: 'error' })
         }
     }
 
     async function handleDeleteSet(seId, setGroupId) {
         try {
-            const { error: deleteError } = await supabase
-                .from('workout_set_groups')
-                .delete()
-                .eq('id', setGroupId)
-
-            if (deleteError) throw deleteError
-
-            const updatedSession = await refetchSession()
-            return updatedSession
+            return await deleteSet(seId, setGroupId)
         } catch (err) {
             console.error('Failed to delete set', err)
-            setToast({
-                message: 'Failed to remove set. Check your connection and try again.',
-                type: 'error'
-            })
+            setToast({ message: 'Failed to remove set locally. Try again.', type: 'error' })
         }
     }
 
     async function handleAddExercise(exerciseId) {
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const userId = userData.user.id
-
-            const nextIndex = session.exercises.length
-
-            const { data: seData, error: insertError } = await supabase
-                .from('workout_session_exercises')
-                .insert({
-                    user_id: userId,
-                    workout_session_id: sessionId,
-                    exercise_id: exerciseId,
-                    order_index: nextIndex,
-                    rest_seconds: 90,
-                })
-                .select('*, exercises(name, muscle_group)')
-                .single()
-
-            if (insertError) throw insertError
-
-            const newSe = {
-                id: seData.id,
-                exerciseId: seData.exercise_id,
-                exerciseName: seData.exercises.name,
-                muscleGroup: seData.exercises.muscle_group,
-                orderIndex: seData.order_index,
-                targetSets: null,
-                targetMinReps: null,
-                targetMaxReps: null,
-                restSeconds: seData.rest_seconds,
-                setGroups: [],
-            }
-
+            const newSe = await addExerciseToSession(exerciseId)
             setExerciseMeta(prev => ({
                 ...prev,
                 [newSe.id]: { note: '', restDuration: 90, defaultUnit: 'KG' }
             }))
-
-            try {
-                const { data: perfData } = await supabase
-                    .from('workout_session_exercises')
-                    .select(`
-                    exercise_id,
-                    exercises(name),
-                    workout_session_id,
-                    workout_sessions!inner(id, created_at, status),
-                    workout_set_groups(*, workout_set_entries(*))
-                `)
-                    .eq('exercise_id', exerciseId)
-                    .eq('workout_sessions.status', 'COMPLETED')
-                    .neq('workout_session_id', sessionId)
-                    .order('workout_sessions(created_at)', { ascending: false })
-                    .limit(1)
-
-                if (perfData && perfData.length > 0) {
-                    const last = perfData[0]
-                    if (last.workout_set_groups?.length > 0) {
-                        setLastPerformances(prev => ({
-                            ...prev,
-                            [exerciseId]: {
-                                exerciseId,
-                                setGroups: last.workout_set_groups
-                                    .sort((a, b) => a.set_number - b.set_number)
-                                    .map(g => ({
-                                        id: g.id,
-                                        setNumber: g.set_number,
-                                        setType: g.set_type,
-                                        entries: (g.workout_set_entries || [])
-                                            .sort((a, b) => a.entry_number - b.entry_number)
-                                            .map(e => ({
-                                                weight: e.weight,
-                                                weightUnit: e.weight_unit,
-                                                reps: e.reps,
-                                            }))
-                                    }))
-                            }
-                        }))
-                    }
-                }
-            } catch (_) {}
-
-            setSession(prev => ({
-                ...prev,
-                exercises: [...prev.exercises, newSe]
-            }))
-
+            const perf = await getLastPerformance(exerciseId)
+            if (perf) {
+                setLastPerformances(prev => ({ ...prev, [exerciseId]: perf }))
+            }
             setShowAddExercise(false)
             setShowReplaceFor(null)
         } catch (err) {
             console.error('Failed to add exercise', err)
-            setToast({
-                message: 'Failed to add exercise. Try again.',
-                type: 'error'
-            })
+            setToast({ message: 'Failed to add exercise. Try again.', type: 'error' })
         }
     }
 
     async function handleFinish() {
         setFinishing(true)
         try {
-            const { error: finishError } = await supabase
-                .from('workout_sessions')
-                .update({
-                    status: 'COMPLETED',
-                    finished_at: new Date().toISOString(),
-                })
-                .eq('id', sessionId)
-
-            if (finishError) throw finishError
+            await finishSession()
             navigate('/history')
         } catch (err) {
             console.error(err)
-            setToast({
-                message: 'Failed to save workout. Try again.',
-                type: 'error'
-            })
+            setToast({ message: 'Failed to save workout. Try again.', type: 'error' })
         } finally {
             setFinishing(false)
         }
@@ -473,9 +154,6 @@ export default function StartWorkout() {
     async function handleAutoFinish() {
         setFinishing(true)
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const userId = userData.user.id
-
             for (const se of session.exercises) {
                 const target = se.targetSets || 3
                 const logged = se.setGroups?.length || 0
@@ -486,53 +164,23 @@ export default function StartWorkout() {
                     const lastEntry = lastPerf?.setGroups?.[i]?.entries?.[0]
                     if (!lastEntry) continue
 
-                    const nextSetNumber = i + 1
-
-                    const { data: groupData, error: groupError } = await supabase
-                        .from('workout_set_groups')
-                        .insert({
-                            user_id: userId,
-                            session_exercise_id: se.id,
-                            set_number: nextSetNumber,
-                            set_type: 'NORMAL',
-                        })
-                        .select()
-                        .single()
-
-                    if (groupError) throw groupError
-
-                    const { error: entryError } = await supabase
-                        .from('workout_set_entries')
-                        .insert({
-                            user_id: userId,
-                            set_group_id: groupData.id,
-                            entry_number: 1,
+                    await logSet(se.id, {
+                        setType: 'NORMAL',
+                        entries: [{
                             weight: lastEntry.weight,
-                            weight_unit: lastEntry.weightUnit,
+                            weightUnit: lastEntry.weightUnit,
                             reps: lastEntry.reps,
-                            reached_failure: false,
-                        })
-
-                    if (entryError) throw entryError
+                            reachedFailure: false,
+                        }]
+                    })
                 }
             }
 
-            const { error: finishError } = await supabase
-                .from('workout_sessions')
-                .update({
-                    status: 'COMPLETED',
-                    finished_at: new Date().toISOString(),
-                })
-                .eq('id', sessionId)
-
-            if (finishError) throw finishError
+            await finishSession()
             navigate('/history')
         } catch (err) {
             console.error('Auto-finish failed', err)
-            setToast({
-                message: 'Failed to auto-fill and finish. Try again.',
-                type: 'error'
-            })
+            setToast({ message: 'Failed to auto-fill and finish. Try again.', type: 'error' })
         } finally {
             setFinishing(false)
         }
@@ -540,10 +188,7 @@ export default function StartWorkout() {
 
     async function handleDiscard() {
         try {
-            await supabase
-                .from('workout_sessions')
-                .update({ status: 'CANCELLED' })
-                .eq('id', sessionId)
+            await cancelSession()
         } catch (_) {}
         navigate('/')
     }
@@ -601,6 +246,12 @@ export default function StartWorkout() {
     return (
         <div className="min-h-screen bg-gray-950 pb-36">
 
+            <Toast
+                message={toast?.message}
+                type={toast?.type}
+                onDismiss={() => setToast(null)}
+            />
+
             <div className="sticky top-0 z-40 bg-gray-950 border-b border-gray-800 px-4 py-3">
                 <div className="flex items-center justify-between">
                     <div>
@@ -625,9 +276,7 @@ export default function StartWorkout() {
                     <div className="text-center py-16">
                         <p className="text-4xl mb-3">🏋️</p>
                         <p className="text-gray-500 text-sm">No exercises yet.</p>
-                        <p className="text-gray-600 text-xs mt-1">
-                            Tap + Add Exercise below.
-                        </p>
+                        <p className="text-gray-600 text-xs mt-1">Tap + Add Exercise below.</p>
                     </div>
                 ) : (
                     session.exercises.map(se => (
@@ -654,10 +303,7 @@ export default function StartWorkout() {
 
             {showFinishModal && (
                 <div className="fixed inset-0 z-50 flex items-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setShowFinishModal(false)}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setShowFinishModal(false)} />
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 pb-10 w-full z-10">
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
 
@@ -665,9 +311,7 @@ export default function StartWorkout() {
                             <>
                                 <div className="text-center mb-6">
                                     <p className="text-4xl mb-3">⚠️</p>
-                                    <h2 className="text-white font-bold text-xl">
-                                        Not quite done
-                                    </h2>
+                                    <h2 className="text-white font-bold text-xl">Not quite done</h2>
                                     <p className="text-gray-500 text-sm mt-1">
                                         {getIncompleteCount()} set{getIncompleteCount() !== 1 ? 's' : ''} not logged yet
                                     </p>
@@ -705,9 +349,7 @@ export default function StartWorkout() {
                             <>
                                 <div className="text-center mb-6">
                                     <p className="text-5xl mb-3">💪</p>
-                                    <h2 className="text-white font-bold text-xl">
-                                        Workout Complete
-                                    </h2>
+                                    <h2 className="text-white font-bold text-xl">Workout Complete</h2>
                                     <p className="text-gray-500 text-sm mt-1">
                                         {session?.routineName} · {formatTime(elapsed)}
                                     </p>
@@ -752,17 +394,13 @@ export default function StartWorkout() {
                                 {showReplaceFor ? 'Replace Exercise' : 'Add Exercise'}
                             </h2>
                             <p className="text-gray-500 text-xs mt-1">
-                                {showReplaceFor
-                                    ? `Replacing ${showReplaceFor.exerciseName}`
-                                    : 'Add to current session'}
+                                {showReplaceFor ? `Replacing ${showReplaceFor.exerciseName}` : 'Add to current session'}
                             </p>
                         </div>
                         <div className="overflow-y-auto px-5 pb-10">
                             {(showReplaceFor ? replaceAvailable : availableExercises).length === 0 ? (
                                 <div className="text-center py-8">
-                                    <p className="text-gray-500 text-sm">
-                                        No exercises available.
-                                    </p>
+                                    <p className="text-gray-500 text-sm">No exercises available.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2 mt-2">
@@ -772,19 +410,13 @@ export default function StartWorkout() {
                                             onClick={() => handleAddExercise(ex.id)}
                                             className="w-full bg-gray-800 active:bg-gray-700 border border-gray-700 rounded-xl px-4 py-3 text-left transition-colors"
                                         >
-                                            <p className="text-white text-sm font-medium">
-                                                {ex.name}
-                                            </p>
+                                            <p className="text-white text-sm font-medium">{ex.name}</p>
                                             <div className="flex gap-2 mt-1">
                                                 {ex.muscleGroup && (
-                                                    <span className="text-xs text-orange-400">
-                                                        {ex.muscleGroup}
-                                                    </span>
+                                                    <span className="text-xs text-orange-400">{ex.muscleGroup}</span>
                                                 )}
                                                 {ex.equipment && (
-                                                    <span className="text-xs text-gray-500">
-                                                        {ex.equipment}
-                                                    </span>
+                                                    <span className="text-xs text-gray-500">{ex.equipment}</span>
                                                 )}
                                             </div>
                                         </button>

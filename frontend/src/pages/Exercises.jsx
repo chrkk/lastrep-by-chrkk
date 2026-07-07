@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useExercises } from '../hooks/useExercises'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
@@ -14,8 +14,7 @@ const EQUIPMENT = [
 ]
 
 export default function Exercises() {
-    const [exercises, setExercises] = useState([])
-    const [loading, setLoading] = useState(true)
+    const { exercises, loading, addExercise, updateExercise, deleteExercise } = useExercises()
     const [showForm, setShowForm] = useState(false)
     const [editingExercise, setEditingExercise] = useState(null)
     const [form, setForm] = useState({ name: '', muscleGroup: '', equipment: '' })
@@ -26,30 +25,10 @@ export default function Exercises() {
     const [toast, setToast] = useState(null)
 
     useEffect(() => {
-        fetchExercises()
-    }, [])
-
-    useEffect(() => {
         const open = showForm || deleteTarget !== null
         document.body.style.overflow = open ? 'hidden' : ''
         return () => { document.body.style.overflow = '' }
     }, [showForm, deleteTarget])
-
-    async function fetchExercises() {
-        try {
-            const { data, error: fetchError } = await supabase
-                .from('exercises')
-                .select('*')
-                .order('created_at', { ascending: false })
-
-            if (fetchError) throw fetchError
-            setExercises(data)
-        } catch (err) {
-            console.error('Failed to fetch exercises', err)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     function openCreateForm() {
         setEditingExercise(null)
@@ -62,8 +41,8 @@ export default function Exercises() {
         setEditingExercise(exercise)
         setForm({
             name: exercise.name,
-            muscleGroup: exercise.muscle_group || '',
-            equipment: exercise.equipment || ''
+            muscleGroup: exercise.muscleGroup || '',
+            equipment: exercise.equipment || '',
         })
         setError('')
         setShowForm(true)
@@ -86,33 +65,12 @@ export default function Exercises() {
         setSaving(true)
         try {
             if (editingExercise) {
-                const { error: updateError } = await supabase
-                    .from('exercises')
-                    .update({
-                        name: form.name,
-                        muscle_group: form.muscleGroup || null,
-                        equipment: form.equipment || null,
-                    })
-                    .eq('id', editingExercise.id)
-
-                if (updateError) throw updateError
+                await updateExercise(editingExercise.id, form)
             } else {
-                const { data: userData } = await supabase.auth.getUser()
-                const { error: insertError } = await supabase
-                    .from('exercises')
-                    .insert({
-                        user_id: userData.user.id,
-                        name: form.name,
-                        muscle_group: form.muscleGroup || null,
-                        equipment: form.equipment || null,
-                    })
-
-                if (insertError) throw insertError
+                await addExercise(form)
             }
-            await fetchExercises()
             closeForm()
         } catch (err) {
-            console.error(err)
             setError('Failed to save exercise. Please try again.')
         } finally {
             setSaving(false)
@@ -127,30 +85,12 @@ export default function Exercises() {
         if (!deleteTarget) return
         setDeleting(true)
         try {
-            const { error: deleteError } = await supabase
-                .from('exercises')
-                .delete()
-                .eq('id', deleteTarget.id)
-
-            if (deleteError) {
-                if (deleteError.code === '23503') {
-                    setToast({
-                        message: 'This exercise is used in a routine or has workout history and can\'t be deleted.',
-                        type: 'error'
-                    })
-                } else {
-                    throw deleteError
-                }
-                return
-            }
-
-            setExercises(prev => prev.filter(e => e.id !== deleteTarget.id))
+            await deleteExercise(deleteTarget.id)
+            setDeleteTarget(null)
         } catch (err) {
-            console.error('Failed to delete exercise', err)
-            setToast({ message: 'Failed to delete exercise. Try again.', type: 'error' })
+            setToast({ message: err.message || 'Failed to delete exercise.', type: 'error' })
         } finally {
             setDeleting(false)
-            setDeleteTarget(null)
         }
     }
 
@@ -165,7 +105,6 @@ export default function Exercises() {
             />
 
             <div className="px-4 py-6">
-
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Exercises</h1>
@@ -180,12 +119,14 @@ export default function Exercises() {
                 </div>
 
                 {loading ? (
-                    <div className="text-gray-600 text-sm text-center py-16">
-                        Loading...
-                    </div>
+                    <div className="text-gray-600 text-sm text-center py-16">Loading...</div>
                 ) : exercises.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-4xl mb-3">🏋️</p>
+                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
                         <p className="text-gray-500 text-sm">No exercises yet.</p>
                         <p className="text-gray-600 text-xs mt-1">
                             Tap + Add to create your first exercise.
@@ -204,9 +145,9 @@ export default function Exercises() {
                                             {exercise.name}
                                         </p>
                                         <div className="flex flex-wrap gap-1.5 mt-2">
-                                            {exercise.muscle_group && (
+                                            {exercise.muscleGroup && (
                                                 <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
-                                                    {exercise.muscle_group}
+                                                    {exercise.muscleGroup}
                                                 </span>
                                             )}
                                             {exercise.equipment && (
@@ -245,15 +186,9 @@ export default function Exercises() {
 
             {showForm && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={closeForm}
-                    />
-
+                    <div className="absolute inset-0 bg-black/70" onClick={closeForm} />
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
-
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-
                         <h2 className="text-white font-semibold text-lg mb-5">
                             {editingExercise ? 'Edit Exercise' : 'New Exercise'}
                         </h2>
@@ -266,9 +201,7 @@ export default function Exercises() {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-gray-400 text-sm mb-1.5">
-                                    Exercise name
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-1.5">Exercise name</label>
                                 <input
                                     type="text"
                                     name="name"
@@ -283,9 +216,7 @@ export default function Exercises() {
                             </div>
 
                             <div>
-                                <label className="block text-gray-400 text-sm mb-1.5">
-                                    Muscle group
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-1.5">Muscle group</label>
                                 <select
                                     name="muscleGroup"
                                     value={form.muscleGroup}
@@ -300,9 +231,7 @@ export default function Exercises() {
                             </div>
 
                             <div>
-                                <label className="block text-gray-400 text-sm mb-1.5">
-                                    Equipment
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-1.5">Equipment</label>
                                 <select
                                     name="equipment"
                                     value={form.equipment}
@@ -339,14 +268,8 @@ export default function Exercises() {
 
             {deleteTarget && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setDeleteTarget(null)}
-                    />
-                    <div
-                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
-                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
-                    >
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setDeleteTarget(null)} />
+                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
                         <div className="text-center mb-6">
                             <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">

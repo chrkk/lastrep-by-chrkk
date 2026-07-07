@@ -1,47 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useRoutines } from '../hooks/useRoutines'
+import { useStartSession } from '../hooks/useStartSession'
+import Navbar from '../components/Navbar'
 
 export default function SelectRoutine() {
     const navigate = useNavigate()
-    const [routines, setRoutines] = useState([])
-    const [loading, setLoading] = useState(true)
+    const { routines, loading } = useRoutines()
+    const { startSession } = useStartSession()
     const [starting, setStarting] = useState(null)
-
-    useEffect(() => {
-        fetchRoutines()
-    }, [])
-
-    async function fetchRoutines() {
-        try {
-            const { data: routinesData, error: routinesError } = await supabase
-                .from('routines')
-                .select('*, routine_exercises(id)')
-                .order('routine_order', { ascending: true })
-
-            if (routinesError) throw routinesError
-
-            const withCounts = routinesData.map(r => ({
-                ...r,
-                exercises: r.routine_exercises
-            }))
-
-            setRoutines(withCounts)
-        } catch (err) {
-            console.error('Failed to fetch routines', err)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     async function handleSelect(routineId) {
         setStarting(routineId)
         try {
-            const { data, error: rpcError } = await supabase
-                .rpc('start_workout_session', { routine_id_input: routineId })
-
-            if (rpcError) throw rpcError
-            navigate(`/workout/${data}`)
+            const sessionId = await startSession(routineId)
+            navigate(`/workout/${sessionId}`)
         } catch (err) {
             console.error('Failed to start session', err)
             setStarting(null)
@@ -52,7 +25,6 @@ export default function SelectRoutine() {
 
     return (
         <div className="min-h-screen bg-gray-950">
-
             <div
                 className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800 px-4 py-3"
                 style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
@@ -74,14 +46,10 @@ export default function SelectRoutine() {
             </div>
 
             <div className="px-4 py-6">
-
                 {loading ? (
                     <div className="space-y-3">
                         {[1, 2, 3].map(i => (
-                            <div
-                                key={i}
-                                className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-5 animate-pulse"
-                            >
+                            <div key={i} className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-5 animate-pulse">
                                 <div className="flex items-center gap-4">
                                     <div className="w-11 h-11 rounded-xl bg-gray-800 flex-shrink-0" />
                                     <div className="flex-1 space-y-2">
@@ -130,13 +98,9 @@ export default function SelectRoutine() {
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-white font-semibold text-base">
-                                            {routine.name}
-                                        </p>
+                                        <p className="text-white font-semibold text-base">{routine.name}</p>
                                         {routine.description && (
-                                            <p className="text-gray-500 text-xs mt-0.5 truncate">
-                                                {routine.description}
-                                            </p>
+                                            <p className="text-gray-500 text-xs mt-0.5 truncate">{routine.description}</p>
                                         )}
                                         <p className="text-gray-600 text-xs mt-1">
                                             {routine.exercises?.length === 0

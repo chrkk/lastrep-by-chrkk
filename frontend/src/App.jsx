@@ -1,4 +1,8 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useAuthStore } from './store/authStore'
+import { supabase } from './lib/supabase'
+import { initializeSyncEngine, migrateGuestData, syncNow } from './lib/sync'
 import MobileOnly from './components/MobileOnly'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -10,10 +14,54 @@ import StartWorkout from './pages/StartWorkout'
 import WorkoutHistory from './pages/WorkoutHistory'
 import ExerciseHistory from './pages/ExerciseHistory'
 import SelectRoutine from './pages/SelectRoutine'
-import ProtectedRoute from './components/ProtectedRoute'
 import Settings from './pages/Settings'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
+    const { initialize, signIn, signOut, setMigrating, initialized } = useAuthStore()
+
+    useEffect(() => {
+        initialize()
+        const stopSyncEngine = initializeSyncEngine()
+
+        const { data: listener } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    const currentState = useAuthStore.getState()
+                    if (currentState.isGuest && currentState.userId?.startsWith('guest_')) {
+                        setMigrating(true)
+                        try {
+                            await migrateGuestData(currentState.userId, session.user.id)
+                        } finally {
+                            setMigrating(false)
+                        }
+                    }
+
+                    signIn(session.user.id)
+                    syncNow().catch(error => {
+                        console.error('Failed to sync after sign-in', error)
+                    })
+                }
+                if (event === 'SIGNED_OUT') {
+                    signOut()
+                }
+            }
+        )
+
+        return () => {
+            stopSyncEngine()
+            listener.subscription.unsubscribe()
+        }
+    }, [])
+
+    if (!initialized) {
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        )
+    }
+
     return (
         <MobileOnly>
             <BrowserRouter>

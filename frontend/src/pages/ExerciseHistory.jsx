@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
+import { useAuthStore } from '../store/authStore'
 import Navbar from '../components/Navbar'
 
 function formatDate(dateStr) {
@@ -14,63 +15,77 @@ function formatDate(dateStr) {
 }
 
 export default function ExerciseHistory() {
-    const { id } = useParams()
+    const { id: exerciseId } = useParams()
     const navigate = useNavigate()
+    const { userId } = useAuthStore()
     const [history, setHistory] = useState([])
     const [exerciseName, setExerciseName] = useState('')
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        fetchHistory()
-    }, [id])
+        if (userId && exerciseId) fetchHistory()
+    }, [userId, exerciseId])
 
     async function fetchHistory() {
         try {
-            const { data, error: fetchError } = await supabase
-                .from('workout_session_exercises')
-                .select(`
-                    *,
-                    exercises(name),
-                    workout_sessions!inner(id, created_at, status, routine_name_snapshot),
-                    workout_set_groups(*, workout_set_entries(*))
-                `)
-                .eq('exercise_id', id)
-                .eq('workout_sessions.status', 'COMPLETED')
-                .order('workout_sessions(created_at)', { ascending: false })
+            const exercise = await db.exercises.get(exerciseId)
+            if (exercise) setExerciseName(exercise.name)
 
-            if (fetchError) throw fetchError
+            const completedSessions = await db.workout_sessions
+                .where('[userId+status]')
+                .equals([userId, 'COMPLETED'])
+                .reverse()
+                .sortBy('createdAt')
 
-            const relevant = data.filter(
-                se => se.workout_set_groups && se.workout_set_groups.length > 0
-            )
+            const relevant = []
 
-            if (relevant.length > 0) {
-                setExerciseName(relevant[0].exercises.name)
-            }
+            for (const session of completedSessions) {
+                const se = await db.workout_session_exercises
+                    .where('workoutSessionId')
+                    .equals(session.id)
+                    .filter(e => (e.exerciseId || e.exercise_id) === exerciseId)
+                    .first()
 
-            const mapped = relevant.map(se => ({
-                sessionId: se.workout_session_id,
-                date: se.workout_sessions.created_at,
-                routineName: se.workout_sessions.routine_name_snapshot || 'Custom',
-                setGroups: (se.workout_set_groups || [])
-                    .sort((a, b) => a.set_number - b.set_number)
-                    .map(g => ({
-                        id: g.id,
-                        setNumber: g.set_number,
-                        setType: g.set_type,
-                        entries: (g.workout_set_entries || [])
-                            .sort((a, b) => a.entry_number - b.entry_number)
-                            .map(e => ({
+                if (!se) continue
+
+                const setGroups = await db.workout_set_groups
+                    .where('sessionExerciseId')
+                    .equals(se.id)
+                    .sortBy('setNumber')
+
+                if (setGroups.length === 0) continue
+
+                const setGroupsWithEntries = await Promise.all(
+                    setGroups.map(async g => {
+                        const entries = await db.workout_set_entries
+                            .where('setGroupId')
+                            .equals(g.id)
+                            .sortBy('entryNumber')
+
+                        return {
+                            id: g.id,
+                            setNumber: g.setNumber || g.set_number,
+                            setType: g.setType || g.set_type,
+                            entries: entries.map(e => ({
                                 weight: e.weight,
-                                weightUnit: e.weight_unit,
+                                weightUnit: e.weightUnit || e.weight_unit,
                                 reps: e.reps,
                             }))
-                    }))
-            }))
+                        }
+                    })
+                )
 
-            setHistory(mapped)
+                relevant.push({
+                    sessionId: session.id,
+                    date: session.createdAt || session.created_at,
+                    routineName: session.routineNameSnapshot || session.routine_name_snapshot || 'Custom',
+                    setGroups: setGroupsWithEntries,
+                })
+            }
+
+            setHistory(relevant)
         } catch (err) {
-            console.error('Failed to fetch exercise history', err)
+            console.error('Failed to fetch exercise history from local db', err)
         } finally {
             setLoading(false)
         }
@@ -118,7 +133,24 @@ export default function ExerciseHistory() {
                 </div>
 
                 {loading ? (
-                    <div className="text-gray-600 text-sm text-center py-16">Loading...</div>
+                    <div className="space-y-3">
+                        {[1, 2].map(i => (
+                            <div
+                                key={i}
+                                className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4 animate-pulse"
+                            >
+                                <div className="space-y-2">
+                                    <div className="h-3.5 bg-gray-800 rounded w-1/3" />
+                                    <div className="h-2.5 bg-gray-800 rounded w-1/4" />
+                                    <div className="flex gap-4 mt-3">
+                                        <div className="h-8 bg-gray-800 rounded w-16" />
+                                        <div className="h-8 bg-gray-800 rounded w-16" />
+                                        <div className="h-8 bg-gray-800 rounded w-16" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : history.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
@@ -139,7 +171,10 @@ export default function ExerciseHistory() {
                             const totalSets = entry.setGroups.length
 
                             return (
-                                <div key={entry.sessionId} className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4">
+                                <div
+                                    key={entry.sessionId}
+                                    className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4"
+                                >
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
                                             <p className="text-white text-sm font-medium">
@@ -180,14 +215,14 @@ export default function ExerciseHistory() {
                                     </div>
 
                                     <div className="space-y-0.5">
-                                        {entry.setGroups.map(group => (
-                                            <div key={group.id}>
+                                        {entry.setGroups.map((group, gi) => (
+                                            <div key={group.id || gi}>
                                                 {group.entries.map((e, ei) => (
                                                     <p key={ei} className="text-gray-600 text-xs">
                                                         Set {group.setNumber}
                                                         {group.entries.length > 1 ? `.${ei + 1}` : ''}: {e.weight}
                                                         {e.weightUnit === 'KG' ? 'kg' : 'lbs'} × {e.reps} reps
-                                                        {group.setType !== 'NORMAL' && (
+                                                        {group.setType && group.setType !== 'NORMAL' && (
                                                             <span className="text-gray-700 ml-1">
                                                                 ({group.setType === 'DROP_SET' ? 'Drop' :
                                                                 group.setType === 'PYRAMID_ASCENDING' ? 'Pyr↑' : 'Pyr↓'})

@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useRoutines } from '../hooks/useRoutines'
 import Navbar from '../components/Navbar'
 import Toast from '../components/Toast'
 
 export default function Routines() {
     const navigate = useNavigate()
-    const [routines, setRoutines] = useState([])
-    const [loading, setLoading] = useState(true)
+    const { routines, loading, addRoutine, updateRoutine, deleteRoutine, duplicateRoutine } = useRoutines()
     const [showForm, setShowForm] = useState(false)
     const [editingRoutine, setEditingRoutine] = useState(null)
     const [form, setForm] = useState({ name: '', description: '' })
@@ -19,10 +18,6 @@ export default function Routines() {
     const [toast, setToast] = useState(null)
 
     useEffect(() => {
-        fetchRoutines()
-    }, [])
-
-    useEffect(() => {
         if (showForm) {
             document.body.style.overflow = 'hidden'
         } else {
@@ -30,28 +25,6 @@ export default function Routines() {
         }
         return () => { document.body.style.overflow = '' }
     }, [showForm])
-
-    async function fetchRoutines() {
-        try {
-            const { data: routinesData, error: routinesError } = await supabase
-                .from('routines')
-                .select('*, routine_exercises(id)')
-                .order('routine_order', { ascending: true })
-
-            if (routinesError) throw routinesError
-
-            const withCounts = routinesData.map(r => ({
-                ...r,
-                exercises: r.routine_exercises
-            }))
-
-            setRoutines(withCounts)
-        } catch (err) {
-            console.error('Failed to fetch routines', err)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     function openCreateForm() {
         setEditingRoutine(null)
@@ -85,40 +58,12 @@ export default function Routines() {
         setSaving(true)
         try {
             if (editingRoutine) {
-                const { error: updateError } = await supabase
-                    .from('routines')
-                    .update({ name: form.name, description: form.description || null })
-                    .eq('id', editingRoutine.id)
-
-                if (updateError) throw updateError
+                await updateRoutine(editingRoutine.id, form)
             } else {
-                const { data: userData } = await supabase.auth.getUser()
-
-                const { data: existing, error: countError } = await supabase
-                    .from('routines')
-                    .select('routine_order')
-                    .order('routine_order', { ascending: false })
-                    .limit(1)
-
-                if (countError) throw countError
-
-                const nextOrder = existing.length > 0 ? existing[0].routine_order + 1 : 0
-
-                const { error: insertError } = await supabase
-                    .from('routines')
-                    .insert({
-                        user_id: userData.user.id,
-                        name: form.name,
-                        description: form.description || null,
-                        routine_order: nextOrder,
-                    })
-
-                if (insertError) throw insertError
+                await addRoutine(form)
             }
-            await fetchRoutines()
             closeForm()
         } catch (err) {
-            console.error(err)
             setError('Failed to save routine. Please try again.')
         } finally {
             setSaving(false)
@@ -129,13 +74,8 @@ export default function Routines() {
         e.stopPropagation()
         setDuplicating(routine.id)
         try {
-            const { error: rpcError } = await supabase
-                .rpc('duplicate_routine', { routine_id_input: routine.id })
-
-            if (rpcError) throw rpcError
-            await fetchRoutines()
+            await duplicateRoutine(routine.id)
         } catch (err) {
-            console.error('Failed to duplicate routine', err)
             setToast({ message: 'Failed to duplicate routine. Try again.', type: 'error' })
         } finally {
             setDuplicating(null)
@@ -150,17 +90,9 @@ export default function Routines() {
         if (!deleteTarget) return
         setDeleting(true)
         try {
-            const { error: deleteError } = await supabase
-                .from('routines')
-                .delete()
-                .eq('id', deleteTarget.id)
-
-            if (deleteError) throw deleteError
-
-            setRoutines(prev => prev.filter(r => r.id !== deleteTarget.id))
+            await deleteRoutine(deleteTarget.id)
             setDeleteTarget(null)
         } catch (err) {
-            console.error('Failed to delete routine', err)
             setToast({ message: 'Failed to delete routine. Try again.', type: 'error' })
         } finally {
             setDeleting(false)
@@ -180,7 +112,6 @@ export default function Routines() {
             />
 
             <div className="px-4 py-6">
-
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h1 className="text-xl font-bold text-white">Routines</h1>
@@ -195,12 +126,14 @@ export default function Routines() {
                 </div>
 
                 {loading ? (
-                    <div className="text-gray-600 text-sm text-center py-16">
-                        Loading...
-                    </div>
+                    <div className="text-gray-600 text-sm text-center py-16">Loading...</div>
                 ) : routines.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-4xl mb-3">📋</p>
+                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                        </div>
                         <p className="text-gray-500 text-sm">No routines yet.</p>
                         <p className="text-gray-600 text-xs mt-1">
                             Tap + Add to create your first routine.
@@ -280,13 +213,9 @@ export default function Routines() {
 
             {showForm && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={closeForm}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={closeForm} />
                     <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
-
                         <h2 className="text-white font-semibold text-lg mb-5">
                             {editingRoutine ? 'Edit Routine' : 'New Routine'}
                         </h2>
@@ -299,9 +228,7 @@ export default function Routines() {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-gray-400 text-sm mb-1.5">
-                                    Routine name
-                                </label>
+                                <label className="block text-gray-400 text-sm mb-1.5">Routine name</label>
                                 <input
                                     type="text"
                                     name="name"
@@ -314,7 +241,6 @@ export default function Routines() {
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>
-
                             <div>
                                 <label className="block text-gray-400 text-sm mb-1.5">
                                     Description
@@ -330,7 +256,6 @@ export default function Routines() {
                                     className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
                                 />
                             </div>
-
                             <div className="flex gap-3 pt-1">
                                 <button
                                     type="button"
@@ -354,14 +279,8 @@ export default function Routines() {
 
             {deleteTarget && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setDeleteTarget(null)}
-                    />
-                    <div
-                        className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10"
-                        style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}
-                    >
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setDeleteTarget(null)} />
+                    <div className="relative bg-gray-900 rounded-t-3xl px-5 pt-5 z-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
                         <div className="w-10 h-1 bg-gray-700 rounded-full mx-auto mb-5" />
                         <div className="text-center mb-6">
                             <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">

@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { db } from '../lib/db'
+import { useAuthStore } from '../store/authStore'
+import { useRoutines } from '../hooks/useRoutines'
+import { useStartSession } from '../hooks/useStartSession'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 
@@ -24,104 +28,108 @@ function formatDate(dateStr) {
 
 export default function Dashboard() {
     const navigate = useNavigate()
-    const [name, setName] = useState('')
+    const { userId, isGuest } = useAuthStore()
+    const { routines, loading: routinesLoading } = useRoutines()
+    const { startSession } = useStartSession()
+
+    const [name, setName] = useState('there')
     const [dashboard, setDashboard] = useState(null)
     const [loading, setLoading] = useState(true)
     const [starting, setStarting] = useState(false)
 
     useEffect(() => {
-        fetchDashboard()
-    }, [])
+        if (!isGuest) {
+            supabase.auth.getUser().then(({ data }) => {
+                const user = data?.user
+                if (user) {
+                    const displayName = user.user_metadata?.name
+                        || user.email?.split('@')[0]
+                        || 'there'
+                    setName(displayName)
+                }
+            })
+        }
+    }, [isGuest])
+
+    useEffect(() => {
+        if (userId) fetchDashboard()
+    }, [userId, routines])
 
     async function fetchDashboard() {
         try {
-            const { data: userData } = await supabase.auth.getUser()
-            const user = userData.user
-            const displayName = user.user_metadata?.name || user.email?.split('@')[0] || 'there'
-            setName(displayName)
+            const exerciseCount = await db.exercises
+                .where('userId').equals(userId)
+                .filter(e => !e.deletedAt)
+                .count()
 
-            const [
-                { data: routinesData },
-                { data: exercisesData },
-                { data: sessionsData },
-            ] = await Promise.all([
-                supabase
-                    .from('routines')
-                    .select('id, name, routine_order')
-                    .order('routine_order', { ascending: true }),
-                supabase
-                    .from('exercises')
-                    .select('id')
-                    .limit(1),
-                supabase
-                    .from('workout_sessions')
-                    .select('id, routine_id, routine_name_snapshot, status, created_at, finished_at')
-                    .eq('status', 'COMPLETED')
-                    .order('created_at', { ascending: false })
-                    .limit(20),
-            ])
-
-            const hasRoutines = (routinesData?.length || 0) > 0
-            const hasExercises = (exercisesData?.length || 0) > 0
-
-            const completed = sessionsData || []
-
-            const lastSession = completed[0] || null
+            const hasExercises = exerciseCount > 0
+            const hasRoutines = routines.length > 0
 
             const weekStart = new Date()
             weekStart.setDate(weekStart.getDate() - 7)
-            const weeklyCount = completed.filter(
-                s => new Date(s.created_at) > weekStart
-            ).length
 
-            const lastDuration = lastSession?.finished_at
+            const allCompleted = await db.workout_sessions
+                .where('[userId+status]')
+                .equals([userId, 'COMPLETED'])
+                .reverse()
+                .sortBy('createdAt')
+
+            const lastSession = allCompleted[0] || null
+
+            const weeklyCount = allCompleted.filter(s => {
+                const date = new Date(s.createdAt || s.created_at)
+                return date > weekStart
+            }).length
+
+            const lastDuration = lastSession?.finishedAt || lastSession?.finished_at
                 ? Math.floor(
-                    (new Date(lastSession.finished_at) - new Date(lastSession.created_at)) / 1000
+                    (new Date(lastSession.finishedAt || lastSession.finished_at) -
+                        new Date(lastSession.createdAt || lastSession.created_at)) / 1000
                 )
                 : null
 
             let suggestedRoutineId = null
             let suggestedRoutineName = null
 
-            if (routinesData && routinesData.length > 0) {
-                if (!lastSession || !lastSession.routine_id) {
-                    suggestedRoutineId = routinesData[0].id
-                    suggestedRoutineName = routinesData[0].name
+            if (routines.length > 0) {
+                if (!lastSession || !lastSession.routineId) {
+                    suggestedRoutineId = routines[0].id
+                    suggestedRoutineName = routines[0].name
                 } else {
-                    const lastIndex = routinesData.findIndex(
-                        r => r.id === lastSession.routine_id
-                    )
+                    const lastRoutineId = lastSession.routineId || lastSession.routine_id
+                    const lastIndex = routines.findIndex(r => r.id === lastRoutineId)
                     const nextIndex = lastIndex === -1
                         ? 0
-                        : (lastIndex + 1) % routinesData.length
-                    suggestedRoutineId = routinesData[nextIndex].id
-                    suggestedRoutineName = routinesData[nextIndex].name
+                        : (lastIndex + 1) % routines.length
+                    suggestedRoutineId = routines[nextIndex].id
+                    suggestedRoutineName = routines[nextIndex].name
                 }
             }
 
-            const recentSessions = completed.slice(0, 5).map(s => ({
+            const recentSessions = allCompleted.slice(0, 5).map(s => ({
                 id: s.id,
-                routineName: s.routine_name_snapshot || 'Custom Workout',
-                date: s.created_at,
-                durationSeconds: s.finished_at
+                routineName: s.routineNameSnapshot || s.routine_name_snapshot || 'Custom Workout',
+                date: s.createdAt || s.created_at,
+                durationSeconds: (s.finishedAt || s.finished_at)
                     ? Math.floor(
-                        (new Date(s.finished_at) - new Date(s.created_at)) / 1000
+                        (new Date(s.finishedAt || s.finished_at) -
+                            new Date(s.createdAt || s.created_at)) / 1000
                     )
                     : null,
             }))
 
             setDashboard({
-                hasRoutines,
                 hasExercises,
+                hasRoutines,
                 suggestedRoutineId,
                 suggestedRoutineName,
-                lastWorkoutDate: lastSession?.created_at || null,
+                lastWorkoutDate: lastSession?.createdAt || lastSession?.created_at || null,
                 lastWorkoutDuration: lastDuration,
                 weeklySessionCount: weeklyCount,
                 recentSessions,
             })
         } catch (err) {
-            console.error('Failed to fetch dashboard', err)
+            console.error('Failed to fetch dashboard from local db', err)
         } finally {
             setLoading(false)
         }
@@ -131,13 +139,8 @@ export default function Dashboard() {
         if (!dashboard?.suggestedRoutineId) return
         setStarting(true)
         try {
-            const { data, error: rpcError } = await supabase
-                .rpc('start_workout_session', {
-                    routine_id_input: dashboard.suggestedRoutineId
-                })
-
-            if (rpcError) throw rpcError
-            navigate(`/workout/${data}`)
+            const sessionId = await startSession(dashboard.suggestedRoutineId)
+            navigate(`/workout/${sessionId}`)
         } catch (err) {
             console.error('Failed to start workout', err)
         } finally {
@@ -155,7 +158,7 @@ export default function Dashboard() {
 
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold text-white">
-                        Hey, {name}
+                        Hey, {isGuest ? 'Guest' : name}
                     </h1>
                     <p className="text-gray-500 text-sm mt-1">
                         {loading ? 'Loading...' : isNewUser
@@ -174,7 +177,7 @@ export default function Dashboard() {
                             </svg>
                         </div>
                         <h2 className="text-white font-bold text-lg mb-1">
-                            Welcome to LastRep
+                            {isGuest ? 'Welcome to LastRep' : 'Welcome to LastRep'}
                         </h2>
                         <p className="text-gray-500 text-sm mb-5">
                             Two quick steps and you're ready to train.
@@ -256,7 +259,6 @@ export default function Dashboard() {
                                 </span>
                             </button>
                         )}
-
                         <button
                             onClick={() => navigate('/select-routine')}
                             className="w-full bg-gray-900 border border-gray-800 active:bg-gray-800 text-gray-400 text-sm py-3 rounded-2xl mb-6 transition-colors"
@@ -293,12 +295,8 @@ export default function Dashboard() {
                         className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5 text-left active:bg-gray-800 transition-colors"
                     >
                         <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
-                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                                />
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                             </svg>
                         </div>
                         <p className="text-white text-sm font-medium">Routines</p>
@@ -309,12 +307,8 @@ export default function Dashboard() {
                         className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5 text-left active:bg-gray-800 transition-colors"
                     >
                         <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
-                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                                />
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
                         <p className="text-white text-sm font-medium">Exercises</p>
@@ -325,7 +319,7 @@ export default function Dashboard() {
                         className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5 text-left active:bg-gray-800 transition-colors"
                     >
                         <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
-                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </div>
@@ -334,7 +328,7 @@ export default function Dashboard() {
                     </button>
                     <div className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-5">
                         <div className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center mb-3">
-                            <svg className="w-4.5 h-4.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
                             </svg>
                         </div>
