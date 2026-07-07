@@ -15,11 +15,6 @@ const syncableTables = [
     'workout_set_entries',
 ]
 
-function stripLocalOnlyFields(row) {
-    const { syncStatus, ...payload } = row
-    return payload
-}
-
 function toRemoteRow(tableName, row) {
     const common = {
         id: row.id,
@@ -208,36 +203,58 @@ async function getPendingCounts(userId) {
 async function syncTable(tableName, userId) {
     const table = db[tableName]
 
-    const pendingRows = await table.where('[userId+syncStatus]').equals([userId, 'pending']).toArray()
+    const pendingRows = [
+        ...(await table.where('[userId+syncStatus]').equals([userId, 'pending']).toArray()),
+        ...(await table.where('[userId+syncStatus]').equals([userId, 'sync_error']).toArray()),
+    ]
 
     for (const row of pendingRows) {
-        const { error } = await supabase
-            .from(tableName)
-            .upsert(toRemoteRow(tableName, row), { onConflict: 'id' })
+        try {
+            const { error } = await supabase
+                .from(tableName)
+                .upsert(toRemoteRow(tableName, row), { onConflict: 'id' })
 
-        if (error) {
-            throw error
+            if (error) {
+                throw error
+            }
+
+            await table.update(row.id, {
+                syncStatus: 'synced',
+                updatedAt: new Date().toISOString(),
+            })
+        } catch (error) {
+            await table.update(row.id, {
+                syncStatus: 'sync_error',
+                updatedAt: new Date().toISOString(),
+            })
+            console.error(`Failed to sync ${tableName} row`, error)
         }
-
-        await table.update(row.id, {
-            syncStatus: 'synced',
-            updatedAt: new Date().toISOString(),
-        })
     }
 
-    const pendingDeletes = await table.where('[userId+syncStatus]').equals([userId, 'pending_delete']).toArray()
+    const pendingDeletes = [
+        ...(await table.where('[userId+syncStatus]').equals([userId, 'pending_delete']).toArray()),
+        ...(await table.where('[userId+syncStatus]').equals([userId, 'sync_error']).toArray()),
+    ]
 
     for (const row of pendingDeletes) {
-        const { error } = await supabase
-            .from(tableName)
-            .delete()
-            .eq('id', row.id)
+        try {
+            const { error } = await supabase
+                .from(tableName)
+                .delete()
+                .eq('id', row.id)
 
-        if (error) {
-            throw error
+            if (error) {
+                throw error
+            }
+
+            await table.delete(row.id)
+        } catch (error) {
+            await table.update(row.id, {
+                syncStatus: 'sync_error',
+                updatedAt: new Date().toISOString(),
+            })
+            console.error(`Failed to delete ${tableName} row`, error)
         }
-
-        await table.delete(row.id)
     }
 }
 
