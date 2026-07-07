@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { supabase } from './lib/supabase'
+import { initializeSyncEngine } from './lib/sync'
 import MobileOnly from './components/MobileOnly'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -21,6 +22,7 @@ function App() {
 
     useEffect(() => {
         initialize()
+        const stopSyncEngine = initializeSyncEngine()
 
         const { data: listener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
@@ -33,7 +35,10 @@ function App() {
             }
         )
 
-        return () => listener.subscription.unsubscribe()
+        return () => {
+            stopSyncEngine()
+            listener.subscription.unsubscribe()
+        }
     }, [])
 
     if (!initialized) {
