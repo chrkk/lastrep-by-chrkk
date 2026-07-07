@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useWorkoutHistory } from '../hooks/useWorkoutHistory'
 import Navbar from '../components/Navbar'
 
 function formatDuration(seconds) {
@@ -34,71 +34,8 @@ function formatTime(dateStr) {
 
 export default function WorkoutHistory() {
     const navigate = useNavigate()
-    const [sessions, setSessions] = useState([])
-    const [loading, setLoading] = useState(true)
+    const { sessions, loading } = useWorkoutHistory()
     const [expandedId, setExpandedId] = useState(null)
-
-    useEffect(() => {
-        fetchSessions()
-    }, [])
-
-    async function fetchSessions() {
-        try {
-            const { data, error: fetchError } = await supabase
-                .from('workout_sessions')
-                .select(`
-                    *,
-                    workout_session_exercises(
-                        *,
-                        exercises(name, muscle_group),
-                        workout_set_groups(
-                            *,
-                            workout_set_entries(*)
-                        )
-                    )
-                `)
-                .eq('status', 'COMPLETED')
-                .order('created_at', { ascending: false })
-
-            if (fetchError) throw fetchError
-
-            const mapped = data.map(session => ({
-                id: session.id,
-                routineName: session.routine_name_snapshot || 'Custom Workout',
-                status: session.status,
-                createdAt: session.created_at,
-                finishedAt: session.finished_at,
-                exercises: (session.workout_session_exercises || [])
-                    .sort((a, b) => a.order_index - b.order_index)
-                    .map(se => ({
-                        id: se.id,
-                        exerciseId: se.exercise_id,
-                        exerciseName: se.exercises.name,
-                        muscleGroup: se.exercises.muscle_group,
-                        setGroups: (se.workout_set_groups || [])
-                            .sort((a, b) => a.set_number - b.set_number)
-                            .map(g => ({
-                                id: g.id,
-                                setNumber: g.set_number,
-                                setType: g.set_type,
-                                entries: (g.workout_set_entries || [])
-                                    .sort((a, b) => a.entry_number - b.entry_number)
-                                    .map(e => ({
-                                        weight: e.weight,
-                                        weightUnit: e.weight_unit,
-                                        reps: e.reps,
-                                    }))
-                            }))
-                    }))
-            }))
-
-            setSessions(mapped)
-        } catch (err) {
-            console.error('Failed to fetch sessions', err)
-        } finally {
-            setLoading(false)
-        }
-    }
 
     function getDuration(session) {
         if (!session.finishedAt) return null
@@ -127,8 +64,19 @@ export default function WorkoutHistory() {
                 </div>
 
                 {loading ? (
-                    <div className="text-gray-600 text-sm text-center py-16">
-                        Loading...
+                    <div className="space-y-2">
+                        {[1, 2, 3].map(i => (
+                            <div
+                                key={i}
+                                className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-4 animate-pulse"
+                            >
+                                <div className="space-y-2">
+                                    <div className="h-3.5 bg-gray-800 rounded w-1/2" />
+                                    <div className="h-2.5 bg-gray-800 rounded w-1/3" />
+                                    <div className="h-2.5 bg-gray-800 rounded w-1/4" />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : sessions.length === 0 ? (
                     <div className="text-center py-16">
@@ -145,7 +93,10 @@ export default function WorkoutHistory() {
                 ) : (
                     <div className="space-y-2">
                         {sessions.map(session => (
-                            <div key={session.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+                            <div
+                                key={session.id}
+                                className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden"
+                            >
                                 <button
                                     onClick={() => setExpandedId(
                                         expandedId === session.id ? null : session.id
@@ -174,7 +125,7 @@ export default function WorkoutHistory() {
                                                 </span>
                                             </div>
                                         </div>
-                                        <span className={`text-gray-600 text-lg transition-transform ${
+                                        <span className={`text-gray-600 text-lg transition-transform duration-200 ${
                                             expandedId === session.id ? 'rotate-90' : ''
                                         }`}>
                                             ›
@@ -197,14 +148,14 @@ export default function WorkoutHistory() {
                                                         History →
                                                     </button>
                                                 </div>
-                                                {se.setGroups?.map(group => (
-                                                    <div key={group.id} className="ml-2">
+                                                {se.setGroups?.map((group, gi) => (
+                                                    <div key={group.id || gi} className="ml-2">
                                                         {group.entries.map((entry, ei) => (
                                                             <p key={ei} className="text-gray-600 text-xs py-0.5">
                                                                 Set {group.setNumber}
                                                                 {group.entries.length > 1 ? `.${ei + 1}` : ''}: {entry.weight}
                                                                 {entry.weightUnit === 'KG' ? 'kg' : 'lbs'} × {entry.reps} reps
-                                                                {group.setType !== 'NORMAL' && (
+                                                                {group.setType && group.setType !== 'NORMAL' && (
                                                                     <span className="text-gray-700 ml-1">
                                                                         ({group.setType === 'DROP_SET' ? 'Drop' :
                                                                         group.setType === 'PYRAMID_ASCENDING' ? 'Pyr↑' : 'Pyr↓'})
