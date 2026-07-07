@@ -278,7 +278,42 @@ async function pullTable(tableName, userId, lastSyncedAt) {
         return
     }
 
-    const localRows = data.map(row => fromRemoteRow(tableName, row))
+    const localById = new Map(
+        await db[tableName]
+            .where('userId')
+            .equals(userId)
+            .toArray()
+            .then(rows => rows.map(row => [row.id, row]))
+    )
+
+    const localRows = data
+        .map(row => {
+            const incoming = fromRemoteRow(tableName, row)
+            const existing = localById.get(incoming.id)
+
+            if (!existing) {
+                return incoming
+            }
+
+            const incomingUpdatedAt = new Date(incoming.updatedAt || 0).getTime()
+            const existingUpdatedAt = new Date(existing.updatedAt || 0).getTime()
+
+            if (existing.syncStatus !== 'synced' && existingUpdatedAt >= incomingUpdatedAt) {
+                return null
+            }
+
+            if (existing.deletedAt && existing.syncStatus !== 'synced') {
+                return null
+            }
+
+            if (existingUpdatedAt > incomingUpdatedAt) {
+                return null
+            }
+
+            return incoming
+        })
+        .filter(Boolean)
+
     await db[tableName].bulkPut(localRows)
 }
 
