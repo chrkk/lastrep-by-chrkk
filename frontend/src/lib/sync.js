@@ -5,6 +5,16 @@ import { useAuthStore } from '../store/authStore'
 let initialized = false
 let running = false
 
+const syncableTables = [
+    'exercises',
+    'routines',
+    'routine_exercises',
+    'workout_sessions',
+    'workout_session_exercises',
+    'workout_set_groups',
+    'workout_set_entries',
+]
+
 async function checkServerReachable() {
     try {
         const { error } = await supabase
@@ -19,19 +29,9 @@ async function checkServerReachable() {
 }
 
 async function getPendingCounts(userId) {
-    const tableNames = [
-        'exercises',
-        'routines',
-        'routine_exercises',
-        'workout_sessions',
-        'workout_session_exercises',
-        'workout_set_groups',
-        'workout_set_entries',
-    ]
-
     const counts = {}
 
-    for (const tableName of tableNames) {
+    for (const tableName of syncableTables) {
         const table = db[tableName]
         const pending = await table.where('[userId+syncStatus]').equals([userId, 'pending']).count()
         const pendingDelete = await table.where('[userId+syncStatus]').equals([userId, 'pending_delete']).count()
@@ -74,6 +74,36 @@ export async function syncNow() {
     } finally {
         running = false
     }
+}
+
+export async function migrateGuestData(guestUserId, realUserId) {
+    if (!guestUserId || !realUserId || guestUserId === realUserId) {
+        return { skipped: true, reason: 'invalid-arguments' }
+    }
+
+    const now = new Date().toISOString()
+
+    await db.transaction('rw', db.meta, ...syncableTables.map(tableName => db[tableName]), async () => {
+        for (const tableName of syncableTables) {
+            const table = db[tableName]
+            const records = await table.where('userId').equals(guestUserId).toArray()
+
+            if (records.length === 0) continue
+
+            const migratedRecords = records.map(record => ({
+                ...record,
+                userId: realUserId,
+                syncStatus: 'pending',
+                updatedAt: now,
+            }))
+
+            await table.bulkPut(migratedRecords)
+        }
+
+        await db.meta.delete('guestUserId')
+    })
+
+    return { skipped: false }
 }
 
 export function initializeSyncEngine() {

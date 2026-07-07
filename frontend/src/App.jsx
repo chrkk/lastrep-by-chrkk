@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { supabase } from './lib/supabase'
-import { initializeSyncEngine } from './lib/sync'
+import { initializeSyncEngine, migrateGuestData } from './lib/sync'
 import MobileOnly from './components/MobileOnly'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -18,7 +18,7 @@ import Settings from './pages/Settings'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
-    const { initialize, signIn, signOut, initialized } = useAuthStore()
+    const { initialize, signIn, signOut, setMigrating, initialized } = useAuthStore()
 
     useEffect(() => {
         initialize()
@@ -27,6 +27,16 @@ function App() {
         const { data: listener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (event === 'SIGNED_IN' && session) {
+                    const currentState = useAuthStore.getState()
+                    if (currentState.isGuest && currentState.userId?.startsWith('guest_')) {
+                        setMigrating(true)
+                        try {
+                            await migrateGuestData(currentState.userId, session.user.id)
+                        } finally {
+                            setMigrating(false)
+                        }
+                    }
+
                     signIn(session.user.id)
                 }
                 if (event === 'SIGNED_OUT') {
