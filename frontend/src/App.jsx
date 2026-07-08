@@ -16,6 +16,7 @@ import ExerciseHistory from './pages/ExerciseHistory'
 import SelectRoutine from './pages/SelectRoutine'
 import Settings from './pages/Settings'
 import ProtectedRoute from './components/ProtectedRoute'
+import OnboardingModal from './components/OnboardingModal'
 
 function App() {
     const { initialize, signIn, signOut, setMigrating, initialized } = useAuthStore()
@@ -65,6 +66,7 @@ function App() {
     return (
         <MobileOnly>
             <BrowserRouter>
+                <OnboardingModal />
                 <Routes>
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
