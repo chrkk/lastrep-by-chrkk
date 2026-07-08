@@ -6,6 +6,7 @@ import { useRoutines } from '../hooks/useRoutines'
 import { useStartSession } from '../hooks/useStartSession'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import InstallBanner from '../components/InstallBanner'
 
 function formatDuration(seconds) {
     if (!seconds) return null
@@ -154,6 +155,7 @@ export default function Dashboard() {
     return (
         <div className="min-h-screen bg-gray-950 pb-24">
             <Navbar />
+            <InstallBanner />
             <div className="px-4 py-6">
 
                 <div className="mb-6">
